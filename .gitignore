@@ -17,12 +17,12 @@ app/google-services.json
 
 # AI
 .claude
-.pi/
-.agents/*
-.agent-work/
+.omp/**
+.agents/**
+.agent-work/**
 .codex/**
 openspec
-swarm-report/
+swarm-report/**
 AGENTS.md
 CLAUDE.md
 skills-lock.json
