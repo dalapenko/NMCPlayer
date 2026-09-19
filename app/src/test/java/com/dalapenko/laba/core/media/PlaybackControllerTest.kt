@@ -157,4 +157,48 @@ class PlaybackControllerTest {
         assertNotNull(snapshot)
         assertEquals(5_000L, snapshot!!.currentPositionMs)
     }
+
+    @Test
+    fun givenTransientIoError_whenRecoveryBudgetRemains_thenRetriesWithoutMarkingUnavailable() {
+        assertEquals(
+            PlaybackErrorAction.RETRY,
+            classifyPlaybackError(
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                recoveryAttempt = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun givenTransientIoError_whenRecoveryBudgetIsExhausted_thenWaitsWithoutMarkingUnavailable() {
+        assertEquals(
+            PlaybackErrorAction.WAIT_FOR_RECOVERY,
+            classifyPlaybackError(
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                recoveryAttempt = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun givenMissingFileError_whenClassified_thenMarksTrackUnavailable() {
+        assertEquals(
+            PlaybackErrorAction.MARK_UNAVAILABLE,
+            classifyPlaybackError(
+                androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+                recoveryAttempt = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun givenNonIoPlaybackError_whenClassified_thenIgnoresIt() {
+        assertEquals(
+            PlaybackErrorAction.IGNORE,
+            classifyPlaybackError(
+                androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED,
+                recoveryAttempt = 0,
+            ),
+        )
+    }
 }

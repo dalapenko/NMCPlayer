@@ -8,6 +8,7 @@ import com.dalapenko.laba.core.database.entity.TrackEntity
 class PlaybackPreparer(
     private val progressRepository: ProgressRepository,
     private val playbackController: PlaybackController,
+    private val safPlaybackCache: SafPlaybackCache? = null,
 ) {
 
     suspend fun setupPlayback(
@@ -30,9 +31,14 @@ class PlaybackPreparer(
             null
         }
 
+        val playbackUris = safPlaybackCache?.cacheTracks(bookId, tracks)
+
         applyInitialState(progress, targetTrackIndex, tracks)
 
-        playbackController.setPlaylist(buildPlaylistItems(tracks, book), bookId)
+        playbackController.setPlaylist(
+            buildPlaylistItems(tracks, book, playbackUris),
+            bookId,
+        )
         playbackController.setBookMetadata(
             bookId = bookId,
             trackIds = tracks.map { it.id },
@@ -72,15 +78,23 @@ class PlaybackPreparer(
         }
     }
 
-    private fun buildPlaylistItems(tracks: List<TrackEntity>, book: BookEntity): List<PlaylistItem> {
-        return tracks.map { track ->
+    private fun buildPlaylistItems(
+        tracks: List<TrackEntity>,
+        book: BookEntity,
+        playbackUris: List<String>?,
+    ): List<PlaylistItem> {
+        return tracks.mapIndexed { index, track ->
             PlaylistItem(
-                uri = track.fileUri,
+                uri = playbackUris?.getOrNull(index) ?: track.fileUri,
                 title = track.fileName,
                 artist = book.author,
                 artworkUri = book.coverUri,
             )
         }
+    }
+
+    suspend fun clearBookCache(bookId: Long) {
+        safPlaybackCache?.clearBook(bookId)
     }
 
     private suspend fun resumeOrResetProgress(

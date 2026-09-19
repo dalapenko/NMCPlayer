@@ -337,6 +337,7 @@ class LibraryViewModel(
                 playbackController.stop()
             }
             repository.deleteBook(bookWithProgress.book)
+            playbackPreparer.clearBookCache(bookWithProgress.book.id)
             scanner.deleteCoverFile(bookWithProgress.book.coverUri)
             if (deleteFiles) {
                 val deleted = scanner.deleteBookFiles(bookWithProgress.book.rootFolderUri)

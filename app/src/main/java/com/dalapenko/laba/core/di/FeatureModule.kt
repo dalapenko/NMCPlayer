@@ -15,7 +15,7 @@ val featureModule = module {
     single { SettingsRepository(get()) }
     viewModelOf(::SettingsViewModel)
 
-    single { PlaybackPreparer(get(), get()) }
+    single { PlaybackPreparer(get(), get(), get()) }
 
     viewModelOf(::LibraryViewModel)
     // bookId and autoPlay are injected via parametersOf at the call site

@@ -11,6 +11,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -55,7 +57,10 @@ class PlaybackService : MediaSessionService() {
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+        val mediaSourceFactory = DefaultMediaSourceFactory(this)
+            .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(MIN_LOADABLE_RETRY_COUNT))
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(AudioAttributes.DEFAULT, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -353,6 +358,7 @@ class PlaybackService : MediaSessionService() {
 
 private const val TAG = "PlaybackService"
 private const val COMPLETION_THRESHOLD_MS = 1_000L
+private const val MIN_LOADABLE_RETRY_COUNT = 5
 
 internal data class ProgressSaveSnapshot(
     val bookId: Long,

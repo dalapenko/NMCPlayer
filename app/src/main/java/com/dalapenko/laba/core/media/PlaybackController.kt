@@ -54,6 +54,34 @@ private const val TRACK_LOAD_DELAY_MS = 100L
 private const val TRACK_END_OFFSET_MS = 1000L
 private const val POSITION_POLL_INTERVAL_MS = 250L
 private const val MAX_CONSECUTIVE_ERRORS_FOR_BOOK = 3
+private const val MAX_TRANSIENT_RECOVERY_ATTEMPTS = 2
+private const val TRANSIENT_RETRY_DELAY_MS = 1_000L
+
+internal enum class PlaybackErrorAction {
+    RETRY,
+    WAIT_FOR_RECOVERY,
+    MARK_UNAVAILABLE,
+    IGNORE,
+}
+
+internal fun classifyPlaybackError(errorCode: Int, recoveryAttempt: Int): PlaybackErrorAction =
+    when {
+        errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
+            errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> {
+            PlaybackErrorAction.MARK_UNAVAILABLE
+        }
+        errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+            errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+            errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+            errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+            if (recoveryAttempt < MAX_TRANSIENT_RECOVERY_ATTEMPTS) {
+                PlaybackErrorAction.RETRY
+            } else {
+                PlaybackErrorAction.WAIT_FOR_RECOVERY
+            }
+        }
+        else -> PlaybackErrorAction.IGNORE
+    }
 
 /**
  * Singleton controller managing playback via MediaSessionService.
@@ -74,6 +102,9 @@ class PlaybackController(private val context: Context) {
     // Track consecutive errors to detect if entire book is unavailable
     private var consecutiveErrors = 0
     private var lastErrorTrackIndex = -1
+    private var transientRecoveryAttempts = 0
+    private var recoveryJob: Job? = null
+    private var isWaitingForTransientRecovery = false
 
     // Prevent state updates while loading new playlist to avoid flickering
     private var isLoadingPlaylist = false
@@ -99,10 +130,12 @@ class PlaybackController(private val context: Context) {
 
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            // Reset error counter when playback succeeds
+            // Reset error counters when playback succeeds
             if (isPlaying) {
                 consecutiveErrors = 0
                 lastErrorTrackIndex = -1
+                transientRecoveryAttempts = 0
+                isWaitingForTransientRecovery = false
             }
             updateState()
             if (isPlaying) startPositionPolling()
@@ -126,34 +159,22 @@ class PlaybackController(private val context: Context) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION
-            ) {
-                val trackIndex = controller?.currentMediaItemIndex ?: -1
+            val trackIndex = controller?.currentMediaItemIndex ?: -1
+            val action = classifyPlaybackError(error.errorCode, transientRecoveryAttempts)
+            Log.e(
+                TAG,
+                "Playback error code=${error.errorCode}, trackIndex=$trackIndex, action=$action",
+                error,
+            )
 
-                // Track consecutive errors to detect if entire book is gone
-                if (trackIndex == lastErrorTrackIndex) {
-                    consecutiveErrors++
-                } else {
-                    consecutiveErrors = 1
-                    lastErrorTrackIndex = trackIndex
+            when (action) {
+                PlaybackErrorAction.RETRY -> retryAfterTransientError(trackIndex)
+                PlaybackErrorAction.WAIT_FOR_RECOVERY -> waitForTransientRecovery(trackIndex)
+                PlaybackErrorAction.MARK_UNAVAILABLE -> {
+                    transientRecoveryAttempts = 0
+                    markTrackUnavailable(trackIndex)
                 }
-
-                // If we've had 3+ consecutive errors on different tracks, entire book is likely gone
-                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS_FOR_BOOK) {
-                    consecutiveErrors = 0
-                    _playbackError.tryEmit(PlaybackError.BookUnavailable)
-                    return
-                }
-
-                if (trackIndex >= 0) {
-                    _playbackError.tryEmit(PlaybackError.TrackUnavailable(trackIndex))
-                    // Try to recover by moving to previous track's end
-                    handleMissingTrack(trackIndex)
-                } else {
-                    _playbackError.tryEmit(PlaybackError.BookUnavailable)
-                }
+                PlaybackErrorAction.IGNORE -> Unit
             }
         }
     }
@@ -220,6 +241,8 @@ class PlaybackController(private val context: Context) {
     }
 
     fun play() {
+        transientRecoveryAttempts = 0
+        isWaitingForTransientRecovery = false
         controller?.play()
     }
 
@@ -228,6 +251,10 @@ class PlaybackController(private val context: Context) {
     }
 
     fun stop() {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        transientRecoveryAttempts = 0
+        isWaitingForTransientRecovery = false
         controller?.run {
             stop()
             clearMediaItems()
@@ -269,6 +296,10 @@ class PlaybackController(private val context: Context) {
     }
 
     fun setPlaylist(items: List<PlaylistItem>, bookId: Long) {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        transientRecoveryAttempts = 0
+        isWaitingForTransientRecovery = false
         _currentBookId.value = bookId
         // Note: PlayerState should be set via setInitialState() before calling this
         // Keep isLoadingPlaylist = true to prevent listener updates
@@ -383,6 +414,59 @@ class PlaybackController(private val context: Context) {
         controller?.setPlaybackSpeed(speed)
     }
 
+    private fun retryAfterTransientError(trackIndex: Int) {
+        if (trackIndex < 0) return
+
+        transientRecoveryAttempts++
+        recoveryJob?.cancel()
+        recoveryJob = scope.launch {
+            delay(TRANSIENT_RETRY_DELAY_MS * transientRecoveryAttempts)
+            val c = controller ?: return@launch
+            if (!c.isConnected || c.currentMediaItemIndex != trackIndex) return@launch
+
+            val shouldResume = c.playWhenReady
+            c.prepare()
+            if (shouldResume) c.play()
+        }
+    }
+    private fun waitForTransientRecovery(trackIndex: Int) {
+        val c = controller
+        val shouldWait = !isWaitingForTransientRecovery &&
+            trackIndex >= 0 &&
+            c != null &&
+            c.isConnected &&
+            c.currentMediaItemIndex == trackIndex
+        if (shouldWait) {
+            isWaitingForTransientRecovery = true
+            c?.pause()
+            c?.prepare()
+        }
+    }
+
+    private fun markTrackUnavailable(trackIndex: Int) {
+        // Track consecutive errors to detect if entire book is gone
+        if (trackIndex == lastErrorTrackIndex) {
+            consecutiveErrors++
+        } else {
+            consecutiveErrors = 1
+            lastErrorTrackIndex = trackIndex
+        }
+
+        // If we've had 3+ consecutive errors on different tracks, entire book is likely gone
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS_FOR_BOOK) {
+            consecutiveErrors = 0
+            _playbackError.tryEmit(PlaybackError.BookUnavailable)
+            return
+        }
+
+        if (trackIndex >= 0) {
+            _playbackError.tryEmit(PlaybackError.TrackUnavailable(trackIndex))
+            // Try to recover by moving to previous track's end
+            handleMissingTrack(trackIndex)
+        } else {
+            _playbackError.tryEmit(PlaybackError.BookUnavailable)
+        }
+    }
     private fun handleMissingTrack(missingTrackIndex: Int) {
         val c = controller ?: return
 

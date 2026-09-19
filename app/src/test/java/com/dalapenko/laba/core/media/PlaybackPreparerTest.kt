@@ -181,4 +181,30 @@ class PlaybackPreparerTest {
             )
         }
     }
+
+    @Test
+    fun givenSafTracksWithCachedSources_whenSetupPlayback_thenPlaylistUsesPrivateSources() = runTest {
+        val book = testBook(id = 9L)
+        val tracks = listOf(
+            testTrack(id = 40L, bookId = 9L, fileUri = "content://t40"),
+            testTrack(id = 41L, bookId = 9L, fileUri = "content://t41"),
+        )
+        val cache = mockk<SafPlaybackCache>()
+        coEvery { mockProgressRepository.getProgress(9L) } returns null
+        coEvery { cache.cacheTracks(9L, tracks) } returns listOf(
+            "file:///data/user/0/com.dalapenko.laba/files/playback-cache/9/40.audio",
+            "file:///data/user/0/com.dalapenko.laba/files/playback-cache/9/41.audio",
+        )
+
+        val cachedPreparer = PlaybackPreparer(mockProgressRepository, mockController, cache)
+        cachedPreparer.setupPlayback(9L, book, tracks, autoPlay = false)
+
+        val playlistSlot = slot<List<PlaylistItem>>()
+        verify { mockController.setPlaylist(capture(playlistSlot), 9L) }
+        assertEquals(
+            "file:///data/user/0/com.dalapenko.laba/files/playback-cache/9/40.audio",
+            playlistSlot.captured.first().uri,
+        )
+        assertEquals("content://t40", tracks.first().fileUri)
+    }
 }
