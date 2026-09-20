@@ -25,7 +25,7 @@ rootProject.file("local.properties").also { f ->
 // with every release as required by https://developer.android.com/studio/publish/versioning
 val versionMajor = 1
 val versionMinor = 4
-val versionPatch = 2
+val versionPatch = 3
 
 android {
     namespace = "com.dalapenko.laba"

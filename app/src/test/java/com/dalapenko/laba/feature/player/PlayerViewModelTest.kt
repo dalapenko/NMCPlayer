@@ -65,7 +65,7 @@ class PlayerViewModelTest {
         // Default: book not found — override per test
         coEvery { mockRepository.getBookWithTracks(any()) } returns null
         coEvery { mockProgressDao.getByBook(any()) } returns null
-        coJustRun { mockProgressDao.upsert(any()) }
+        coJustRun { mockProgressDao.upsertIfNewer(any()) }
         coJustRun { mockRepository.setBookAvailability(any(), any()) }
         coJustRun { mockSettingsRepository.setLastFixedSleepTimerMinutes(any()) }
         justRun { mockController.captureCurrentBookState() }
@@ -251,7 +251,7 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            mockProgressDao.upsert(match { !it.isCompleted && it.lastPositionMs == 0L })
+            mockProgressDao.upsertIfNewer(match { !it.isCompleted && it.lastPositionMs == 0L })
         }
     }
 
@@ -351,7 +351,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify { mockProgressDao.upsert(match { it.isCompleted }) }
+        coVerify { mockProgressDao.upsertIfNewer(match { it.isCompleted }) }
     }
 
     @Test
@@ -371,7 +371,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressDao.upsert(match { it.isCompleted }) }
+        coVerify(exactly = 0) { mockProgressDao.upsertIfNewer(match { it.isCompleted }) }
     }
 
     @Test
@@ -395,7 +395,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressDao.upsert(match { it.isCompleted }) }
+        coVerify(exactly = 0) { mockProgressDao.upsertIfNewer(match { it.isCompleted }) }
     }
 
     // ── saveProgressInternal ──────────────────────────────────────────────────
@@ -424,7 +424,7 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            mockProgressDao.upsert(
+            mockProgressDao.upsertIfNewer(
                 match {
                     it.lastPositionMs == 29_500L &&
                         it.isCompleted
@@ -456,7 +456,7 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            mockProgressDao.upsert(
+            mockProgressDao.upsertIfNewer(
                 match {
                     it.completedTracksMs == 30_000L && // tracks 0+1 = 10000+20000
                         it.isCompleted
@@ -482,7 +482,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressDao.upsert(any()) }
+        coVerify(exactly = 0) { mockProgressDao.upsertIfNewer(any()) }
     }
 
     // ── observePlaybackErrors ─────────────────────────────────────────────────

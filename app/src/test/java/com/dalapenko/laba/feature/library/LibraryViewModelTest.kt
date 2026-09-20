@@ -65,7 +65,7 @@ class LibraryViewModelTest {
 
         // Default progress stubs
         coEvery { mockProgressDao.getByBook(any()) } returns null
-        coJustRun { mockProgressDao.upsert(any()) }
+        coJustRun { mockProgressDao.upsertIfNewer(any()) }
 
         // Default: getBookWithTracks returns null (override per-test)
         coEvery { mockRepository.getBookWithTracks(any()) } returns null

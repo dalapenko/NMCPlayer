@@ -53,7 +53,7 @@ class ProgressSaveWorker(
                 playbackSpeed = playbackSpeed,
             )
 
-            progressDao.upsert(progress)
+            progressDao.upsertIfNewer(progress)
 
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(

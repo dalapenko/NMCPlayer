@@ -105,7 +105,7 @@ class PlaybackPreparer(
         if (targetTrackIndex != null && progress != null) {
             playbackController.seekToTrack(targetTrackIndex, progress.lastPositionMs)
         } else if (progress?.isCompleted == true) {
-            progressDao.upsert(
+            progressDao.upsertIfNewer(
                 progress.copy(
                     isCompleted = false,
                     lastPositionMs = 0L,

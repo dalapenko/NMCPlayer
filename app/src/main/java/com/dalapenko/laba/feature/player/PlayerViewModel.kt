@@ -73,9 +73,9 @@ class PlayerViewModel(
                     book = book,
                     tracks = tracks,
                     isLoading = false,
-                    isInitializing = false,
                 )
                 setupPlaylist(book, tracks)
+                _uiState.value = _uiState.value.copy(isInitializing = false)
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -232,7 +232,7 @@ class PlayerViewModel(
             )
 
         viewModelScope.launch {
-            progressDao.upsert(
+            progressDao.upsertIfNewer(
                 ProgressEntity(
                     bookId = bookId,
                     lastTrackId = currentTrack.id,

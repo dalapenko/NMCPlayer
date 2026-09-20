@@ -26,7 +26,7 @@ class ProgressSaveWorkerTest {
 
     @Before
     fun setup() {
-        coJustRun { mockRepository.upsert(any()) }
+        coJustRun { mockRepository.upsertIfNewer(any()) }
         startKoin {
             modules(module { single { mockRepository } })
         }
@@ -58,7 +58,7 @@ class ProgressSaveWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.upsert(capture(savedSlot)) }
+        coVerify { mockRepository.upsertIfNewer(capture(savedSlot)) }
         assertEquals(1L, savedSlot.captured.bookId)
         assertEquals(2L, savedSlot.captured.lastTrackId)
         assertEquals(30_000L, savedSlot.captured.lastPositionMs)
@@ -78,7 +78,7 @@ class ProgressSaveWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        coVerify(exactly = 0) { mockRepository.upsert(any()) }
+        coVerify(exactly = 0) { mockRepository.upsertIfNewer(any()) }
     }
 
     @Test
@@ -92,7 +92,7 @@ class ProgressSaveWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        coVerify(exactly = 0) { mockRepository.upsert(any()) }
+        coVerify(exactly = 0) { mockRepository.upsertIfNewer(any()) }
     }
 
     @Test
@@ -106,7 +106,7 @@ class ProgressSaveWorkerTest {
         worker.doWork()
 
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.upsert(capture(savedSlot)) }
+        coVerify { mockRepository.upsertIfNewer(capture(savedSlot)) }
         assertEquals(0L, savedSlot.captured.lastPositionMs)
         assertEquals(0L, savedSlot.captured.completedTracksMs)
         assertEquals(1f, savedSlot.captured.playbackSpeed)
@@ -125,7 +125,7 @@ class ProgressSaveWorkerTest {
         worker.doWork()
 
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.upsert(capture(savedSlot)) }
+        coVerify { mockRepository.upsertIfNewer(capture(savedSlot)) }
         assertEquals(true, savedSlot.captured.isCompleted)
     }
 }

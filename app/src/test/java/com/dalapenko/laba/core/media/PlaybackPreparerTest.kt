@@ -36,7 +36,7 @@ class PlaybackPreparerTest {
         justRun { mockController.seekToTrack(any(), any()) }
         justRun { mockController.setSpeed(any()) }
         justRun { mockController.play() }
-        coJustRun { mockProgressDao.upsert(any()) }
+        coJustRun { mockProgressDao.upsertIfNewer(any()) }
         preparer = PlaybackPreparer(mockProgressDao, mockController)
     }
 
@@ -119,7 +119,7 @@ class PlaybackPreparerTest {
 
             verify { mockController.setInitialState(position = 0L, duration = 60_000L, trackIndex = 0, speed = 1.0f) }
             verify(exactly = 0) { mockController.seekToTrack(any(), any()) }
-            coVerify(exactly = 0) { mockProgressDao.upsert(any()) }
+            coVerify(exactly = 0) { mockProgressDao.upsertIfNewer(any()) }
         }
 
     @Test
@@ -136,7 +136,7 @@ class PlaybackPreparerTest {
 
         verify { mockController.setInitialState(position = 0L, duration = 60_000L, trackIndex = 0, speed = 1.0f) }
         val savedSlot = slot<com.dalapenko.laba.core.database.entity.ProgressEntity>()
-        coVerify { mockProgressDao.upsert(capture(savedSlot)) }
+        coVerify { mockProgressDao.upsertIfNewer(capture(savedSlot)) }
         assertEquals(false, savedSlot.captured.isCompleted)
         assertEquals(0L, savedSlot.captured.lastPositionMs)
         assertEquals(0L, savedSlot.captured.completedTracksMs)

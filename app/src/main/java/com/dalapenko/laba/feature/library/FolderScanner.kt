@@ -9,6 +9,7 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.dalapenko.laba.core.database.entity.BookEntity
 import com.dalapenko.laba.core.database.entity.TrackEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -197,6 +198,8 @@ class FolderScanner(private val context: Context) {
                 context.contentResolver.openInputStream(uri)?.use {
                     return@withContext true
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 return@withContext false
             }
@@ -221,6 +224,8 @@ class FolderScanner(private val context: Context) {
             return@withContext hasAudioFiles
         } catch (_: SecurityException) {
             return@withContext false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             // Last resort: try ContentResolver query fallback
             try {
@@ -234,6 +239,8 @@ class FolderScanner(private val context: Context) {
                     return@withContext cursor.count > 0
                 }
                 return@withContext false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 return@withContext false
             }
@@ -261,6 +268,8 @@ class FolderScanner(private val context: Context) {
             doc?.delete() == true
         } catch (_: SecurityException) {
             false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             false
         }

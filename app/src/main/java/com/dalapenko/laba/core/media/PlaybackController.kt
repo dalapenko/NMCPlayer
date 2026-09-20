@@ -110,6 +110,7 @@ class PlaybackController(private val context: Context) {
     private var isLoadingPlaylist = false
 
     private var pollingJob: Job? = null
+    private var connectionMonitoringJob: Job? = null
 
     // Store the last known state for each book to prevent race conditions during book switches
     private val bookStateSnapshots = ConcurrentHashMap<Long, PlayerState>()
@@ -192,6 +193,7 @@ class PlaybackController(private val context: Context) {
                     val mc = future.get()
                     controller = mc
                     mc.addListener(listener)
+                    resendCachedBookMetadata(mc)
                     updateState()
 
                     // Start connection health monitoring
@@ -211,33 +213,33 @@ class PlaybackController(private val context: Context) {
      * This prevents saving stale progress when connection is lost.
      */
     private fun startConnectionMonitoring() {
-        scope.launch {
+        if (connectionMonitoringJob?.isActive == true) return
+
+        connectionMonitoringJob = scope.launch {
             while (true) {
-                delay(CONNECTION_MONITOR_INTERVAL_MS) // Check every 5 seconds
+                delay(CONNECTION_MONITOR_INTERVAL_MS)
                 val c = controller
                 if (c == null || !c.isConnected) {
                     Log.w(TAG, "MediaController disconnected, attempting reconnect...")
                     controller = null
                     isConnecting = false
                     connect()
-                    // Re-send cached metadata to newly connected service
-                    val metadataBundle = cachedBookId?.let { bookId ->
-                        Bundle().apply {
-                            putLong(KEY_BOOK_ID, bookId)
-                            putLongArray(KEY_TRACK_IDS, cachedTrackIds)
-                            putLongArray(KEY_TRACK_DURATIONS, cachedTrackDurations)
-                        }
-                    }
-                    val currentController = controller
-                    if (metadataBundle != null && currentController != null) {
-                        currentController.sendCustomCommand(
-                            SessionCommand(ACTION_SET_BOOK_METADATA, Bundle.EMPTY),
-                            metadataBundle,
-                        )
-                    }
                 }
             }
         }
+    }
+
+    private fun resendCachedBookMetadata(controller: MediaController) {
+        val bookId = cachedBookId ?: return
+        val metadataBundle = Bundle().apply {
+            putLong(KEY_BOOK_ID, bookId)
+            putLongArray(KEY_TRACK_IDS, cachedTrackIds)
+            putLongArray(KEY_TRACK_DURATIONS, cachedTrackDurations)
+        }
+        controller.sendCustomCommand(
+            SessionCommand(ACTION_SET_BOOK_METADATA, Bundle.EMPTY),
+            metadataBundle,
+        )
     }
 
     fun play() {

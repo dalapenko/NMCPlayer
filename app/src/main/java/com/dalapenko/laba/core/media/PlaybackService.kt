@@ -183,7 +183,7 @@ class PlaybackService : MediaSessionService() {
             )
 
             kotlinx.coroutines.withContext(Dispatchers.IO) {
-                progressDao.upsert(progress)
+                progressDao.upsertIfNewer(progress)
             }
 
             if (Log.isLoggable(TAG, Log.DEBUG)) {
