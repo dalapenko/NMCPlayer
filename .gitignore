@@ -26,3 +26,7 @@ swarm-report/**
 AGENTS.md
 CLAUDE.md
 skills-lock.json
+
+# other
+.design
+DESIGN.md
