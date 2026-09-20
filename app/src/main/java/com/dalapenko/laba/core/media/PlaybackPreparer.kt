@@ -1,12 +1,12 @@
 package com.dalapenko.laba.core.media
 
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.BookEntity
 import com.dalapenko.laba.core.database.entity.ProgressEntity
 import com.dalapenko.laba.core.database.entity.TrackEntity
 
 class PlaybackPreparer(
-    private val progressRepository: ProgressRepository,
+    private val progressDao: ProgressDao,
     private val playbackController: PlaybackController,
     private val safPlaybackCache: SafPlaybackCache? = null,
 ) {
@@ -24,7 +24,7 @@ class PlaybackPreparer(
             return
         }
 
-        val progress = progressRepository.getProgress(bookId)
+        val progress = progressDao.getByBook(bookId)
         val targetTrackIndex = if (progress != null && !progress.isCompleted) {
             tracks.indexOfFirst { it.id == progress.lastTrackId }.takeIf { it >= 0 }
         } else {
@@ -105,7 +105,7 @@ class PlaybackPreparer(
         if (targetTrackIndex != null && progress != null) {
             playbackController.seekToTrack(targetTrackIndex, progress.lastPositionMs)
         } else if (progress?.isCompleted == true) {
-            progressRepository.saveProgress(
+            progressDao.upsert(
                 progress.copy(
                     isCompleted = false,
                     lastPositionMs = 0L,

@@ -8,7 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dalapenko.laba.core.data.BookRepository
 import com.dalapenko.laba.core.data.BookWithProgress
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.TrackEntity
 import com.dalapenko.laba.core.media.PlaybackController
 import com.dalapenko.laba.core.media.PlaybackPreparer
@@ -46,7 +46,7 @@ data class ContinueBookUiState(
 
 class LibraryViewModel(
     private val repository: BookRepository,
-    private val progressRepository: ProgressRepository,
+    private val progressDao: ProgressDao,
     private val scanner: FolderScanner,
     private val playbackController: PlaybackController,
     private val playbackPreparer: PlaybackPreparer,
@@ -56,7 +56,7 @@ class LibraryViewModel(
     private val _events = MutableSharedFlow<LibraryEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<LibraryEvent> = _events.asSharedFlow()
 
-    private val lastPlayedBookId: StateFlow<Long?> = progressRepository.observeLastPlayedBookId()
+    private val lastPlayedBookId: StateFlow<Long?> = progressDao.observeLastPlayedBookId()
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val playbackStatus: StateFlow<PlaybackStatus> = combine(
@@ -139,7 +139,7 @@ class LibraryViewModel(
                     ?: return@combine null
                 ContinueBookUiState(
                     book = lastPlayedBook,
-                    status = if (lastPlayedBook.isAvailable) {
+                    status = if (lastPlayedBook.book.isAvailable) {
                         ContinueBookStatus.CONTINUE
                     } else {
                         ContinueBookStatus.LAST_PLAYED

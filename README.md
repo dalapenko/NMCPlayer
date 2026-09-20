@@ -114,7 +114,7 @@ Any audio format supported by ExoPlayer — including MP3, M4A, M4B, AAC, OGG, F
 app/src/main/kotlin/com/dalapenko/laba/
 ├── core/
 │   ├── database/        # Room entities, DAOs, AppDatabase
-│   ├── data/            # BookRepository, ProgressRepository
+│   ├── data/            # BookRepository
 │   ├── di/              # Koin modules (App, Feature, Media)
 │   ├── media/           # PlaybackService, PlaybackController, PlaybackPreparer
 │   └── work/            # ProgressSaveWorker (WorkManager)

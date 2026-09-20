@@ -3,7 +3,7 @@ package com.dalapenko.laba.feature.player
 import app.cash.turbine.test
 import com.dalapenko.laba.MainDispatcherRule
 import com.dalapenko.laba.core.data.BookRepository
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.media.PlaybackController
 import com.dalapenko.laba.core.media.PlaybackError
 import com.dalapenko.laba.core.media.PlaybackPreparer
@@ -41,7 +41,7 @@ class PlayerViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val mockRepository = mockk<BookRepository>()
-    private val mockProgressRepository = mockk<ProgressRepository>()
+    private val mockProgressDao = mockk<ProgressDao>()
     private val mockController = mockk<PlaybackController>()
     private val mockSleepTimerController = mockk<SleepTimerController>()
     private val mockSettingsRepository = mockk<SettingsRepository>()
@@ -64,8 +64,8 @@ class PlayerViewModelTest {
 
         // Default: book not found — override per test
         coEvery { mockRepository.getBookWithTracks(any()) } returns null
-        coEvery { mockProgressRepository.getProgress(any()) } returns null
-        coJustRun { mockProgressRepository.saveProgress(any()) }
+        coEvery { mockProgressDao.getByBook(any()) } returns null
+        coJustRun { mockProgressDao.upsert(any()) }
         coJustRun { mockRepository.setBookAvailability(any(), any()) }
         coJustRun { mockSettingsRepository.setLastFixedSleepTimerMinutes(any()) }
         justRun { mockController.captureCurrentBookState() }
@@ -85,17 +85,16 @@ class PlayerViewModelTest {
     }
 
     private fun createViewModel(autoPlay: Boolean = false): PlayerViewModel {
-        val preparer = PlaybackPreparer(mockProgressRepository, mockController)
+        val preparer = PlaybackPreparer(mockProgressDao, mockController)
         return PlayerViewModel(
-            navArgs = PlayerNavArgs(bookId, autoPlay),
-            dependencies = PlayerViewModelDependencies(
-                repository = mockRepository,
-                progressRepository = mockProgressRepository,
-                playbackController = mockController,
-                playbackPreparer = preparer,
-                sleepTimerController = mockSleepTimerController,
-                settingsRepository = mockSettingsRepository,
-            ),
+            bookId = bookId,
+            autoPlay = autoPlay,
+            repository = mockRepository,
+            progressDao = mockProgressDao,
+            playbackController = mockController,
+            playbackPreparer = preparer,
+            sleepTimerController = mockSleepTimerController,
+            settingsRepository = mockSettingsRepository,
         )
     }
 
@@ -214,7 +213,7 @@ class PlayerViewModelTest {
         val book = testBook(id = bookId)
         val tracks = listOf(testTrack(id = 10L, bookId = bookId, durationMs = 60_000L))
         coEvery { mockRepository.getBookWithTracks(bookId) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(bookId) } returns null
+        coEvery { mockProgressDao.getByBook(bookId) } returns null
 
         createViewModel()
         advanceUntilIdle()
@@ -231,7 +230,7 @@ class PlayerViewModelTest {
         )
         val progress = testProgress(bookId = bookId, lastTrackId = 11L, lastPositionMs = 45_000L, playbackSpeed = 1.5f)
         coEvery { mockRepository.getBookWithTracks(bookId) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(bookId) } returns progress
+        coEvery { mockProgressDao.getByBook(bookId) } returns progress
 
         createViewModel()
         advanceUntilIdle()
@@ -246,15 +245,13 @@ class PlayerViewModelTest {
         val tracks = listOf(testTrack(id = 10L, bookId = bookId))
         val completedProgress = testProgress(bookId = bookId, isCompleted = true, lastTrackId = 10L)
         coEvery { mockRepository.getBookWithTracks(bookId) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(bookId) } returns completedProgress
+        coEvery { mockProgressDao.getByBook(bookId) } returns completedProgress
 
         createViewModel()
         advanceUntilIdle()
 
         coVerify {
-            mockProgressRepository.saveProgress(
-                match { !it.isCompleted && it.lastPositionMs == 0L },
-            )
+            mockProgressDao.upsert(match { !it.isCompleted && it.lastPositionMs == 0L })
         }
     }
 
@@ -354,7 +351,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify { mockProgressRepository.saveProgress(match { it.isCompleted }) }
+        coVerify { mockProgressDao.upsert(match { it.isCompleted }) }
     }
 
     @Test
@@ -374,7 +371,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressRepository.saveProgress(match { it.isCompleted }) }
+        coVerify(exactly = 0) { mockProgressDao.upsert(match { it.isCompleted }) }
     }
 
     @Test
@@ -398,7 +395,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressRepository.saveProgress(match { it.isCompleted }) }
+        coVerify(exactly = 0) { mockProgressDao.upsert(match { it.isCompleted }) }
     }
 
     // ── saveProgressInternal ──────────────────────────────────────────────────
@@ -427,7 +424,7 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            mockProgressRepository.saveProgress(
+            mockProgressDao.upsert(
                 match {
                     it.lastPositionMs == 29_500L &&
                         it.isCompleted
@@ -459,7 +456,7 @@ class PlayerViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            mockProgressRepository.saveProgress(
+            mockProgressDao.upsert(
                 match {
                     it.completedTracksMs == 30_000L && // tracks 0+1 = 10000+20000
                         it.isCompleted
@@ -485,7 +482,7 @@ class PlayerViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { mockProgressRepository.saveProgress(any()) }
+        coVerify(exactly = 0) { mockProgressDao.upsert(any()) }
     }
 
     // ── observePlaybackErrors ─────────────────────────────────────────────────

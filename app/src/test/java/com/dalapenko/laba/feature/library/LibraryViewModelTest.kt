@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import com.dalapenko.laba.MainDispatcherRule
 import com.dalapenko.laba.core.data.BookRepository
 import com.dalapenko.laba.core.data.BookWithProgress
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.media.PlaybackController
 import com.dalapenko.laba.core.media.PlaybackPreparer
 import com.dalapenko.laba.core.media.PlayerState
@@ -37,7 +37,7 @@ class LibraryViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val mockRepository = mockk<BookRepository>()
-    private val mockProgressRepository = mockk<ProgressRepository>()
+    private val mockProgressDao = mockk<ProgressDao>()
     private val mockScanner = mockk<FolderScanner>()
     private val mockController = mockk<PlaybackController>()
     private val mockSettingsRepository = mockk<SettingsRepository>()
@@ -58,14 +58,14 @@ class LibraryViewModelTest {
 
         // Repository stubs for init{} block
         every { mockRepository.observeAllBooksWithProgress() } returns booksWithProgressFlow
-        every { mockProgressRepository.observeLastPlayedBookId() } returns lastPlayedBookIdFlow
+        every { mockProgressDao.observeLastPlayedBookId() } returns lastPlayedBookIdFlow
         coEvery { mockRepository.getBooksWithoutCover() } returns emptyList()
         coJustRun { mockRepository.recheckAllAvailability(any()) }
         justRun { mockController.cleanupOldSnapshots(any()) }
 
         // Default progress stubs
-        coEvery { mockProgressRepository.getProgress(any()) } returns null
-        coJustRun { mockProgressRepository.saveProgress(any()) }
+        coEvery { mockProgressDao.getByBook(any()) } returns null
+        coJustRun { mockProgressDao.upsert(any()) }
 
         // Default: getBookWithTracks returns null (override per-test)
         coEvery { mockRepository.getBookWithTracks(any()) } returns null
@@ -82,10 +82,10 @@ class LibraryViewModelTest {
     }
 
     private fun createViewModel(): LibraryViewModel {
-        val preparer = PlaybackPreparer(mockProgressRepository, mockController)
+        val preparer = PlaybackPreparer(mockProgressDao, mockController)
         return LibraryViewModel(
             mockRepository,
-            mockProgressRepository,
+            mockProgressDao,
             mockScanner,
             mockController,
             preparer,
@@ -153,7 +153,7 @@ class LibraryViewModelTest {
         coEvery { mockRepository.getBookById(2L) } returns book
         coEvery { mockScanner.isBookAvailable(any()) } returns true
         coEvery { mockRepository.getBookWithTracks(2L) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(2L) } returns null
+        coEvery { mockProgressDao.getByBook(2L) } returns null
         val vm = createViewModel()
         advanceUntilIdle()
 
@@ -180,7 +180,7 @@ class LibraryViewModelTest {
         coEvery { mockRepository.getBookById(3L) } returns book
         coEvery { mockScanner.isBookAvailable(any()) } returns true
         coEvery { mockRepository.getBookWithTracks(3L) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(3L) } returns progress
+        coEvery { mockProgressDao.getByBook(3L) } returns progress
         val vm = createViewModel()
         advanceUntilIdle()
 
@@ -208,7 +208,7 @@ class LibraryViewModelTest {
         coEvery { mockRepository.getBookById(4L) } returns book
         coEvery { mockScanner.isBookAvailable(any()) } returns true
         coEvery { mockRepository.getBookWithTracks(4L) } returns (book to tracks)
-        coEvery { mockProgressRepository.getProgress(4L) } returns completedProgress
+        coEvery { mockProgressDao.getByBook(4L) } returns completedProgress
         val vm = createViewModel()
         advanceUntilIdle()
 
@@ -515,7 +515,6 @@ class LibraryViewModelTest {
             testBook(id = 4L, title = "Missing", isAvailable = false),
             testProgress(bookId = 4L),
             0.5f,
-            isAvailable = false,
         )
         booksWithProgressFlow.value = listOf(unavailableBook)
         lastPlayedBookIdFlow.value = 4L

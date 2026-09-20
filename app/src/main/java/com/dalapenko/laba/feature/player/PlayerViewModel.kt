@@ -4,7 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dalapenko.laba.core.data.BookRepository
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.BookEntity
 import com.dalapenko.laba.core.database.entity.ProgressEntity
 import com.dalapenko.laba.core.database.entity.TrackEntity
@@ -38,32 +38,17 @@ data class PlayerUiState(
     val rememberedSleepTimerMinutes: Int = DEFAULT_SLEEP_TIMER_MINUTES,
 )
 
-/** Navigation arguments, bundled so the [PlayerViewModel] constructor stays under detekt's parameter-count limit. */
-data class PlayerNavArgs(val bookId: Long, val autoPlay: Boolean)
-
-/** Player collaborators bundled to keep the ViewModel constructor within the Detekt limit. */
-class PlayerViewModelDependencies(
-    val repository: BookRepository,
-    val progressRepository: ProgressRepository,
-    val playbackController: PlaybackController,
-    val playbackPreparer: PlaybackPreparer,
-    val sleepTimerController: SleepTimerController,
-    val settingsRepository: SettingsRepository,
-)
-
+@Suppress("LongParameterList")
 class PlayerViewModel(
-    private val navArgs: PlayerNavArgs,
-    private val dependencies: PlayerViewModelDependencies,
+    private val bookId: Long,
+    private val autoPlay: Boolean,
+    private val repository: BookRepository,
+    private val progressDao: ProgressDao,
+    private val playbackController: PlaybackController,
+    private val playbackPreparer: PlaybackPreparer,
+    private val sleepTimerController: SleepTimerController,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
-
-    private val bookId: Long get() = navArgs.bookId
-    private val autoPlay: Boolean get() = navArgs.autoPlay
-    private val repository get() = dependencies.repository
-    private val progressRepository get() = dependencies.progressRepository
-    private val playbackController get() = dependencies.playbackController
-    private val playbackPreparer get() = dependencies.playbackPreparer
-    private val sleepTimerController get() = dependencies.sleepTimerController
-    private val settingsRepository get() = dependencies.settingsRepository
 
     private val _events = MutableSharedFlow<PlayerEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<PlayerEvent> = _events.asSharedFlow()
@@ -247,7 +232,7 @@ class PlayerViewModel(
             )
 
         viewModelScope.launch {
-            progressRepository.saveProgress(
+            progressDao.upsert(
                 ProgressEntity(
                     bookId = bookId,
                     lastTrackId = currentTrack.id,

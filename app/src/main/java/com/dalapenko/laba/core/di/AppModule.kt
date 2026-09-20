@@ -3,7 +3,6 @@ package com.dalapenko.laba.core.di
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import com.dalapenko.laba.core.data.BookRepository
-import com.dalapenko.laba.core.data.ProgressRepository
 import com.dalapenko.laba.core.database.AppDatabase
 import com.dalapenko.laba.feature.library.FolderScanner
 import org.koin.android.ext.koin.androidContext
@@ -38,7 +37,6 @@ val appModule = module {
     single { get<AppDatabase>().progressDao() }
 
     single { BookRepository(get(), get(), get()) }
-    single { ProgressRepository(get()) }
     single { FolderScanner(androidContext()) }
 }
 

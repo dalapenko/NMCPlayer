@@ -83,16 +83,6 @@ private val PORTRAIT_TRANSPORT_ICON_SIZE = 36.dp
 private val PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE = 64.dp
 private val PORTRAIT_TRANSPORT_SPACING = 8.dp
 
-/** Bundles viewmodel callbacks so composables down the tree take one param instead of six. */
-private data class PlayerActions(
-    val onSeekTo: (Long) -> Unit,
-    val onSkipToTrack: (Int) -> Unit,
-    val onSeekBack: () -> Unit,
-    val onSeekForward: () -> Unit,
-    val onTogglePlayPause: () -> Unit,
-    val onSetSpeed: (Float) -> Unit,
-)
-
 /** Derived, display-ready playback data shared by the landscape and portrait layouts. */
 private data class PlaybackDisplayState(
     val title: String,
@@ -122,13 +112,6 @@ private data class TransportActions(
     val onSetSpeed: (Float) -> Unit,
 )
 
-/** Bundles the sleep-timer viewmodel callbacks separately so [PlayerActions] stays under the param-count limit. */
-private data class SleepTimerActions(
-    val onStartFixedDuration: (Int) -> Unit,
-    val onStartEndOfChapter: () -> Unit,
-    val onCancel: () -> Unit,
-)
-
 @Composable
 fun PlayerScreen(
     bookId: Long,
@@ -145,30 +128,19 @@ fun PlayerScreen(
         onBack = onBack,
     )
 
-    val actions = remember(viewModel) {
-        PlayerActions(
-            onSeekTo = viewModel::seekTo,
-            onSkipToTrack = viewModel::skipToTrack,
-            onSeekBack = viewModel::seekBack,
-            onSeekForward = viewModel::seekForward,
-            onTogglePlayPause = viewModel::togglePlayPause,
-            onSetSpeed = viewModel::setSpeed,
-        )
-    }
-    val sleepTimerActions = remember(viewModel) {
-        SleepTimerActions(
-            onStartFixedDuration = viewModel::startSleepTimerFixed,
-            onStartEndOfChapter = viewModel::startSleepTimerEndOfChapter,
-            onCancel = viewModel::cancelSleepTimer,
-        )
-    }
-
     PlayerScaffold(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
-        actions = actions,
-        sleepTimerActions = sleepTimerActions,
+        onSeekTo = viewModel::seekTo,
+        onSkipToTrack = viewModel::skipToTrack,
+        onSeekBack = viewModel::seekBack,
+        onSeekForward = viewModel::seekForward,
+        onTogglePlayPause = viewModel::togglePlayPause,
+        onSetSpeed = viewModel::setSpeed,
+        onStartFixedDuration = viewModel::startSleepTimerFixed,
+        onStartEndOfChapter = viewModel::startSleepTimerEndOfChapter,
+        onCancelSleepTimer = viewModel::cancelSleepTimer,
     )
 }
 
@@ -204,8 +176,15 @@ private fun PlayerScaffold(
     uiState: PlayerUiState,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
-    actions: PlayerActions,
-    sleepTimerActions: SleepTimerActions,
+    onSeekTo: (Long) -> Unit,
+    onSkipToTrack: (Int) -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
+    onStartFixedDuration: (Int) -> Unit,
+    onStartEndOfChapter: () -> Unit,
+    onCancelSleepTimer: () -> Unit,
 ) {
     val playerState = uiState.playerState
     val showChapters = remember { mutableStateOf(false) }
@@ -234,7 +213,12 @@ private fun PlayerScaffold(
                 playerState = playerState,
                 isLandscape = isLandscape,
                 padding = padding,
-                actions = actions,
+                onSeekTo = onSeekTo,
+                onSkipToTrack = onSkipToTrack,
+                onSeekBack = onSeekBack,
+                onSeekForward = onSeekForward,
+                onTogglePlayPause = onTogglePlayPause,
+                onSetSpeed = onSetSpeed,
             )
         }
     }
@@ -242,8 +226,10 @@ private fun PlayerScaffold(
     PlayerBottomSheets(
         uiState = uiState,
         playerState = playerState,
-        actions = actions,
-        sleepTimerActions = sleepTimerActions,
+        onSkipToTrack = onSkipToTrack,
+        onStartFixedDuration = onStartFixedDuration,
+        onStartEndOfChapter = onStartEndOfChapter,
+        onCancelSleepTimer = onCancelSleepTimer,
         showChapters = showChapters,
         showSleepTimer = showSleepTimer,
     )
@@ -253,8 +239,10 @@ private fun PlayerScaffold(
 private fun PlayerBottomSheets(
     uiState: PlayerUiState,
     playerState: PlayerState,
-    actions: PlayerActions,
-    sleepTimerActions: SleepTimerActions,
+    onSkipToTrack: (Int) -> Unit,
+    onStartFixedDuration: (Int) -> Unit,
+    onStartEndOfChapter: () -> Unit,
+    onCancelSleepTimer: () -> Unit,
     showChapters: MutableState<Boolean>,
     showSleepTimer: MutableState<Boolean>,
 ) {
@@ -263,7 +251,7 @@ private fun PlayerBottomSheets(
             tracks = uiState.tracks,
             currentTrackIndex = playerState.currentMediaItemIndex,
             onTrackSelected = { index ->
-                actions.onSkipToTrack(index)
+                onSkipToTrack(index)
                 showChapters.value = false
             },
             onDismiss = { showChapters.value = false },
@@ -277,15 +265,15 @@ private fun PlayerBottomSheets(
             remainingChapterMs = (playerState.durationMs - playerState.currentPositionMs).coerceAtLeast(0L),
             initialFixedMinutes = uiState.rememberedSleepTimerMinutes,
             onStartFixedDuration = { minutes ->
-                sleepTimerActions.onStartFixedDuration(minutes)
+                onStartFixedDuration(minutes)
                 showSleepTimer.value = false
             },
             onStartEndOfChapter = {
-                sleepTimerActions.onStartEndOfChapter()
+                onStartEndOfChapter()
                 showSleepTimer.value = false
             },
             onCancel = {
-                sleepTimerActions.onCancel()
+                onCancelSleepTimer()
                 showSleepTimer.value = false
             },
             onDismiss = { showSleepTimer.value = false },
@@ -366,7 +354,12 @@ private fun PlayerContent(
     playerState: PlayerState,
     isLandscape: Boolean,
     padding: PaddingValues,
-    actions: PlayerActions,
+    onSeekTo: (Long) -> Unit,
+    onSkipToTrack: (Int) -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
 ) {
     val currentTrackIndex = playerState.currentMediaItemIndex
         .coerceIn(0, uiState.tracks.lastIndex.coerceAtLeast(0))
@@ -390,20 +383,20 @@ private fun PlayerContent(
         isNextEnabled = uiState.tracks.size > 1 && currentTrackIndex < uiState.tracks.lastIndex,
     )
     val transportActions = TransportActions(
-        onPrevious = { actions.onSkipToTrack(currentTrackIndex - 1) },
-        onRewind = actions.onSeekBack,
-        onPlayPause = actions.onTogglePlayPause,
-        onForward = actions.onSeekForward,
-        onNext = { actions.onSkipToTrack(currentTrackIndex + 1) },
+        onPrevious = { onSkipToTrack(currentTrackIndex - 1) },
+        onRewind = onSeekBack,
+        onPlayPause = onTogglePlayPause,
+        onForward = onSeekForward,
+        onNext = { onSkipToTrack(currentTrackIndex + 1) },
         onSeekChange = {
             isSeeking = true
             seekPosition = it
         },
         onSeekFinished = {
-            actions.onSeekTo(seekPosition.toLong())
+            onSeekTo(seekPosition.toLong())
             isSeeking = false
         },
-        onSetSpeed = actions.onSetSpeed,
+        onSetSpeed = onSetSpeed,
     )
 
     if (isLandscape) {

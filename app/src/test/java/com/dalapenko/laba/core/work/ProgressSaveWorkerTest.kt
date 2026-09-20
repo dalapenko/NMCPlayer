@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.ProgressEntity
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -21,12 +21,12 @@ import org.koin.dsl.module
 
 class ProgressSaveWorkerTest {
 
-    private val mockRepository = mockk<ProgressRepository>()
+    private val mockRepository = mockk<ProgressDao>()
     private val mockContext = mockk<Context>(relaxed = true)
 
     @Before
     fun setup() {
-        coJustRun { mockRepository.saveProgress(any()) }
+        coJustRun { mockRepository.upsert(any()) }
         startKoin {
             modules(module { single { mockRepository } })
         }
@@ -58,7 +58,7 @@ class ProgressSaveWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.saveProgress(capture(savedSlot)) }
+        coVerify { mockRepository.upsert(capture(savedSlot)) }
         assertEquals(1L, savedSlot.captured.bookId)
         assertEquals(2L, savedSlot.captured.lastTrackId)
         assertEquals(30_000L, savedSlot.captured.lastPositionMs)
@@ -78,7 +78,7 @@ class ProgressSaveWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        coVerify(exactly = 0) { mockRepository.saveProgress(any()) }
+        coVerify(exactly = 0) { mockRepository.upsert(any()) }
     }
 
     @Test
@@ -92,7 +92,7 @@ class ProgressSaveWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        coVerify(exactly = 0) { mockRepository.saveProgress(any()) }
+        coVerify(exactly = 0) { mockRepository.upsert(any()) }
     }
 
     @Test
@@ -106,7 +106,7 @@ class ProgressSaveWorkerTest {
         worker.doWork()
 
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.saveProgress(capture(savedSlot)) }
+        coVerify { mockRepository.upsert(capture(savedSlot)) }
         assertEquals(0L, savedSlot.captured.lastPositionMs)
         assertEquals(0L, savedSlot.captured.completedTracksMs)
         assertEquals(1f, savedSlot.captured.playbackSpeed)
@@ -125,7 +125,7 @@ class ProgressSaveWorkerTest {
         worker.doWork()
 
         val savedSlot = slot<ProgressEntity>()
-        coVerify { mockRepository.saveProgress(capture(savedSlot)) }
+        coVerify { mockRepository.upsert(capture(savedSlot)) }
         assertEquals(true, savedSlot.captured.isCompleted)
     }
 }

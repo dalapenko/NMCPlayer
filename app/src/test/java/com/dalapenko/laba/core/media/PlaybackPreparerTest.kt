@@ -1,6 +1,6 @@
 package com.dalapenko.laba.core.media
 
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.testBook
 import com.dalapenko.laba.testProgress
 import com.dalapenko.laba.testTrack
@@ -20,7 +20,7 @@ import org.junit.Test
 
 class PlaybackPreparerTest {
 
-    private val mockProgressRepository = mockk<ProgressRepository>()
+    private val mockProgressDao = mockk<ProgressDao>()
     private val mockController = mockk<PlaybackController>()
     private val currentBookIdFlow = MutableStateFlow<Long?>(null)
 
@@ -36,8 +36,8 @@ class PlaybackPreparerTest {
         justRun { mockController.seekToTrack(any(), any()) }
         justRun { mockController.setSpeed(any()) }
         justRun { mockController.play() }
-        coJustRun { mockProgressRepository.saveProgress(any()) }
-        preparer = PlaybackPreparer(mockProgressRepository, mockController)
+        coJustRun { mockProgressDao.upsert(any()) }
+        preparer = PlaybackPreparer(mockProgressDao, mockController)
     }
 
     @Test
@@ -69,7 +69,7 @@ class PlaybackPreparerTest {
     fun givenDifferentBookWithNoSavedProgress_whenSetupPlayback_thenStartsFromBeginningWithDefaultSpeed() = runTest {
         val book = testBook(id = 2L)
         val tracks = listOf(testTrack(id = 10L, bookId = 2L, durationMs = 60_000L))
-        coEvery { mockProgressRepository.getProgress(2L) } returns null
+        coEvery { mockProgressDao.getByBook(2L) } returns null
 
         preparer.setupPlayback(2L, book, tracks, autoPlay = false)
 
@@ -86,7 +86,7 @@ class PlaybackPreparerTest {
             testTrack(id = 11L, bookId = 3L, durationMs = 90_000L, sequenceOrder = 1),
         )
         val progress = testProgress(bookId = 3L, lastTrackId = 11L, lastPositionMs = 30_000L, playbackSpeed = 1.5f)
-        coEvery { mockProgressRepository.getProgress(3L) } returns progress
+        coEvery { mockProgressDao.getByBook(3L) } returns progress
 
         preparer.setupPlayback(3L, book, tracks, autoPlay = false)
 
@@ -100,7 +100,7 @@ class PlaybackPreparerTest {
         val book = testBook(id = 4L)
         val tracks = listOf(testTrack(id = 10L, bookId = 4L, durationMs = 60_000L))
         val progress = testProgress(bookId = 4L, lastTrackId = 10L, playbackSpeed = 5.0f)
-        coEvery { mockProgressRepository.getProgress(4L) } returns progress
+        coEvery { mockProgressDao.getByBook(4L) } returns progress
 
         preparer.setupPlayback(4L, book, tracks, autoPlay = false)
 
@@ -113,13 +113,13 @@ class PlaybackPreparerTest {
             val book = testBook(id = 5L)
             val tracks = listOf(testTrack(id = 10L, bookId = 5L, durationMs = 60_000L))
             val progress = testProgress(bookId = 5L, lastTrackId = 999L, lastPositionMs = 30_000L, isCompleted = false)
-            coEvery { mockProgressRepository.getProgress(5L) } returns progress
+            coEvery { mockProgressDao.getByBook(5L) } returns progress
 
             preparer.setupPlayback(5L, book, tracks, autoPlay = false)
 
             verify { mockController.setInitialState(position = 0L, duration = 60_000L, trackIndex = 0, speed = 1.0f) }
             verify(exactly = 0) { mockController.seekToTrack(any(), any()) }
-            coVerify(exactly = 0) { mockProgressRepository.saveProgress(any()) }
+            coVerify(exactly = 0) { mockProgressDao.upsert(any()) }
         }
 
     @Test
@@ -130,13 +130,13 @@ class PlaybackPreparerTest {
             testTrack(id = 21L, bookId = 6L, durationMs = 90_000L, sequenceOrder = 1),
         )
         val progress = testProgress(bookId = 6L, lastTrackId = 21L, isCompleted = true)
-        coEvery { mockProgressRepository.getProgress(6L) } returns progress
+        coEvery { mockProgressDao.getByBook(6L) } returns progress
 
         preparer.setupPlayback(6L, book, tracks, autoPlay = false)
 
         verify { mockController.setInitialState(position = 0L, duration = 60_000L, trackIndex = 0, speed = 1.0f) }
         val savedSlot = slot<com.dalapenko.laba.core.database.entity.ProgressEntity>()
-        coVerify { mockProgressRepository.saveProgress(capture(savedSlot)) }
+        coVerify { mockProgressDao.upsert(capture(savedSlot)) }
         assertEquals(false, savedSlot.captured.isCompleted)
         assertEquals(0L, savedSlot.captured.lastPositionMs)
         assertEquals(0L, savedSlot.captured.completedTracksMs)
@@ -147,7 +147,7 @@ class PlaybackPreparerTest {
     fun givenAutoPlayTrue_whenSetupPlaybackForDifferentBook_thenPlayIsCalledAfterSetup() = runTest {
         val book = testBook(id = 7L)
         val tracks = listOf(testTrack(id = 10L, bookId = 7L, durationMs = 60_000L))
-        coEvery { mockProgressRepository.getProgress(7L) } returns null
+        coEvery { mockProgressDao.getByBook(7L) } returns null
 
         preparer.setupPlayback(7L, book, tracks, autoPlay = true)
 
@@ -161,7 +161,7 @@ class PlaybackPreparerTest {
             testTrack(id = 30L, bookId = 8L, fileUri = "content://t30", fileName = "T30", durationMs = 10_000L),
             testTrack(id = 31L, bookId = 8L, fileUri = "content://t31", fileName = "T31", durationMs = 20_000L),
         )
-        coEvery { mockProgressRepository.getProgress(8L) } returns null
+        coEvery { mockProgressDao.getByBook(8L) } returns null
 
         preparer.setupPlayback(8L, book, tracks, autoPlay = false)
 
@@ -190,13 +190,13 @@ class PlaybackPreparerTest {
             testTrack(id = 41L, bookId = 9L, fileUri = "content://t41"),
         )
         val cache = mockk<SafPlaybackCache>()
-        coEvery { mockProgressRepository.getProgress(9L) } returns null
+        coEvery { mockProgressDao.getByBook(9L) } returns null
         coEvery { cache.cacheTracks(9L, tracks) } returns listOf(
             "file:///data/user/0/com.dalapenko.laba/files/playback-cache/9/40.audio",
             "file:///data/user/0/com.dalapenko.laba/files/playback-cache/9/41.audio",
         )
 
-        val cachedPreparer = PlaybackPreparer(mockProgressRepository, mockController, cache)
+        val cachedPreparer = PlaybackPreparer(mockProgressDao, mockController, cache)
         cachedPreparer.setupPlayback(9L, book, tracks, autoPlay = false)
 
         val playlistSlot = slot<List<PlaylistItem>>()

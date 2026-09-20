@@ -15,7 +15,6 @@ data class BookWithProgress(
     val book: BookEntity,
     val progress: ProgressEntity?,
     val progressFraction: Float,
-    val isAvailable: Boolean = book.isAvailable,
 )
 
 class BookRepository(
@@ -33,7 +32,6 @@ class BookRepository(
                     book = book,
                     progress = progress,
                     progressFraction = computeProgressFraction(book, progress),
-                    isAvailable = book.isAvailable,
                 )
             }
         }

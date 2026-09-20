@@ -25,7 +25,7 @@ rootProject.file("local.properties").also { f ->
 // with every release as required by https://developer.android.com/studio/publish/versioning
 val versionMajor = 1
 val versionMinor = 4
-val versionPatch = 1
+val versionPatch = 2
 
 android {
     namespace = "com.dalapenko.laba"
@@ -43,7 +43,6 @@ android {
         @Suppress("UnstableApiUsage")
         androidResources.localeFilters.addAll(setOf("en", "ru"))
 
-        buildConfigField("String", "STORE_LABEL", "\"\"")
     }
 
     val hasSigningConfig = !localProperties.getProperty("signing.storeFile").isNullOrEmpty()
@@ -121,10 +120,8 @@ dependencies {
     // Compose
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)
-    debugImplementation(libs.compose.ui.tooling)
 
     // Activity
     implementation(libs.androidx.activity.compose)
@@ -148,7 +145,6 @@ dependencies {
     // Media3
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
-    implementation(libs.media3.ui)
 
     // DocumentFile
     implementation(libs.androidx.documentfile)
@@ -176,25 +172,19 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
-    testImplementation(libs.room.testing)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.androidx.work.testing)
-    testImplementation(libs.koin.test)
 
     // Android UI Testing
     androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.kaspresso)
     androidTestImplementation(libs.kaspresso.compose)
-    androidTestImplementation(libs.androidx.navigation.testing)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.koin.test)
-    androidTestImplementation(libs.koin.test.junit4)
     androidTestImplementation(libs.mockk.android)
     androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.compose.ui.tooling)
     androidTestImplementation(libs.compose.ui)
     androidTestImplementation(libs.androidx.ui.test.junit4)
 

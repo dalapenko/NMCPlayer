@@ -69,30 +69,7 @@ class FolderScanner(private val context: Context) {
         val audioFiles = collectDirectAudioFiles(root)
         if (audioFiles.isEmpty()) return@withContext null
 
-        val sortedFiles = audioFiles.sortedWith(naturalOrderComparator())
-        // Read all metadata from the first file in one retriever pass
-        val firstMeta = extractAudioMeta(sortedFiles.first().uri)
-
-        val tracks = sortedFiles.mapIndexed { index, file ->
-            ScannedTrack(
-                fileUri = file.uri.toString(),
-                fileName = file.name ?: "Track ${index + 1}",
-                durationMs = if (index == 0) firstMeta.durationMs else extractDuration(file.uri),
-                sequenceOrder = index,
-            )
-        }
-
-        // Prefer an image file in the folder; fall back to embedded art from first track
-        val coverUri = findFolderCoverUri(root)
-            ?: firstMeta.embeddedPictureBytes?.let { saveEmbeddedArt(it, treeUri.toString()) }
-
-        ScannedBook(
-            title = firstMeta.album ?: root.name ?: "Unknown Book",
-            author = firstMeta.author,
-            rootUri = treeUri.toString(),
-            tracks = tracks,
-            coverUri = coverUri,
-        )
+        scanAudioDirectory(root, audioFiles, treeUri.toString())
     }
 
     suspend fun scanSingleFile(uri: Uri): ScannedBook? = withContext(Dispatchers.IO) {
@@ -122,13 +99,12 @@ class FolderScanner(private val context: Context) {
     suspend fun scanFolderTree(treeUri: Uri): List<ScannedBook> = withContext(Dispatchers.IO) {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return@withContext emptyList()
         val results = mutableListOf<ScannedBook>()
-        collectBooksRecursive(root, treeUri, results, 0, mutableSetOf())
+        collectBooksRecursive(root, results, 0, mutableSetOf())
         results
     }
 
     private fun collectBooksRecursive(
         dir: DocumentFile,
-        treeUri: Uri,
         out: MutableList<ScannedBook>,
         depth: Int,
         visited: MutableSet<String>,
@@ -140,37 +116,41 @@ class FolderScanner(private val context: Context) {
         val children = dir.listFiles()
         val directAudio = children.filter { it.isFile && it.type?.startsWith("audio/") == true }
         if (directAudio.isNotEmpty()) {
-            val sorted = directAudio.sortedWith(naturalOrderComparator())
-            val firstMeta = extractAudioMeta(sorted.first().uri)
-
-            val tracks = sorted.mapIndexed { index, file ->
-                ScannedTrack(
-                    fileUri = file.uri.toString(),
-                    fileName = file.name ?: "Track ${index + 1}",
-                    durationMs = if (index == 0) firstMeta.durationMs else extractDuration(file.uri),
-                    sequenceOrder = index,
-                )
-            }
-
-            val coverUri = findFolderCoverUri(dir)
-                ?: firstMeta.embeddedPictureBytes?.let { saveEmbeddedArt(it, dir.uri.toString()) }
-
-            out.add(
-                ScannedBook(
-                    title = firstMeta.album ?: dir.name ?: "Unknown Book",
-                    author = firstMeta.author,
-                    rootUri = dir.uri.toString(),
-                    tracks = tracks,
-                    coverUri = coverUri,
-                ),
-            )
+            out += scanAudioDirectory(dir, directAudio)
         }
 
         for (child in children) {
             if (child.isDirectory) {
-                collectBooksRecursive(child, treeUri, out, depth + 1, visited)
+                collectBooksRecursive(child, out, depth + 1, visited)
             }
         }
+    }
+
+    private fun scanAudioDirectory(
+        directory: DocumentFile,
+        audioFiles: List<DocumentFile>,
+        coverKey: String = directory.uri.toString(),
+    ): ScannedBook {
+        val sortedFiles = audioFiles.sortedWith(naturalOrderComparator())
+        val firstMeta = extractAudioMeta(sortedFiles.first().uri)
+        val tracks = sortedFiles.mapIndexed { index, file ->
+            ScannedTrack(
+                fileUri = file.uri.toString(),
+                fileName = file.name ?: "Track ${index + 1}",
+                durationMs = if (index == 0) firstMeta.durationMs else extractDuration(file.uri),
+                sequenceOrder = index,
+            )
+        }
+        val coverUri = findFolderCoverUri(directory)
+            ?: firstMeta.embeddedPictureBytes?.let { saveEmbeddedArt(it, coverKey) }
+
+        return ScannedBook(
+            title = firstMeta.album ?: directory.name ?: "Unknown Book",
+            author = firstMeta.author,
+            rootUri = directory.uri.toString(),
+            tracks = tracks,
+            coverUri = coverUri,
+        )
     }
 
     /**

@@ -5,7 +5,7 @@ import android.database.sqlite.SQLiteException
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.ProgressEntity
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -27,7 +27,7 @@ class ProgressSaveWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params), KoinComponent {
 
-    private val repository: ProgressRepository by inject()
+    private val progressDao: ProgressDao by inject()
 
     override suspend fun doWork(): Result {
         return try {
@@ -53,7 +53,7 @@ class ProgressSaveWorker(
                 playbackSpeed = playbackSpeed,
             )
 
-            repository.saveProgress(progress)
+            progressDao.upsert(progress)
 
             if (Log.isLoggable(TAG, Log.DEBUG)) {
                 Log.d(

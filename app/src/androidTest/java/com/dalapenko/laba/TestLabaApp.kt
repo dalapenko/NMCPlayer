@@ -35,7 +35,7 @@ class TestLabaApp : Application() {
         startKoin {
             androidContext(this@TestLabaApp)
             modules(
-                appModule,                 // Room DB, DataStore, BookRepository, ProgressRepository, FolderScanner (production)
+                appModule,                 // Room DB, DataStore, BookRepository, FolderScanner (production)
                 mediaModule,               // PlaybackController (production - will be overridden)
                 featureModule,             // ViewModels, PlaybackPreparer, SettingsRepository
                 testDatabaseModule,        // override: in-memory Room, test DataStore, test DAOs

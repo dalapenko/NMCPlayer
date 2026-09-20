@@ -251,12 +251,11 @@ private fun ExternalLinkItem(
 
 @Composable
 private fun settingsVersionText(): String {
-    val storeLabel = if (BuildConfig.DEBUG) "debug" else BuildConfig.STORE_LABEL
     return stringResource(
         R.string.settings_version_value,
         BuildConfig.VERSION_NAME,
         BuildConfig.VERSION_CODE,
-    ) + if (storeLabel.isNotEmpty()) " $storeLabel" else ""
+    ) + if (BuildConfig.DEBUG) " debug" else ""
 }
 
 @Composable

@@ -43,10 +43,3 @@ tasks.register("detektAll") {
     dependsOn(subprojects.map { it.tasks.withType<io.gitlab.arturbosch.detekt.Detekt>() })
 }
 
-tasks.register("detektFormat") {
-    description = "Auto-fix formatting issues with Detekt"
-    group = "formatting"
-    dependsOn(tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().matching {
-        it.name.contains("Format") || it.autoCorrect
-    })
-}

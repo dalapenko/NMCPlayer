@@ -26,7 +26,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.dalapenko.laba.MainActivity
 import com.dalapenko.laba.R
-import com.dalapenko.laba.core.data.ProgressRepository
+import com.dalapenko.laba.core.database.dao.ProgressDao
 import com.dalapenko.laba.core.database.entity.ProgressEntity
 import com.dalapenko.laba.core.work.ProgressSaveWorker
 import com.google.common.collect.ImmutableList
@@ -44,7 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class PlaybackService : MediaSessionService() {
 
-    private val repository: ProgressRepository by inject()
+    private val progressDao: ProgressDao by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var mediaSession: MediaSession? = null
     private var periodicSaveJob: Job? = null
@@ -183,7 +183,7 @@ class PlaybackService : MediaSessionService() {
             )
 
             kotlinx.coroutines.withContext(Dispatchers.IO) {
-                repository.saveProgress(progress)
+                progressDao.upsert(progress)
             }
 
             if (Log.isLoggable(TAG, Log.DEBUG)) {

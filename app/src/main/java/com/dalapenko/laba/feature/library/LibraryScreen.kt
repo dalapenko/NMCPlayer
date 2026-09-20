@@ -1,7 +1,5 @@
 package com.dalapenko.laba.feature.library
 
-import android.content.ContentResolver
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -96,11 +94,6 @@ private data class LibraryBookCardUiState(
     val isPlaying: Boolean,
     val isHighlighted: Boolean,
     val onCoverClick: (() -> Unit)?,
-)
-
-private data class LibraryPickerActions(
-    val onAddFolder: () -> Unit,
-    val onAddFile: () -> Unit,
 )
 
 private const val ACTIVE_COVER_OVERLAY_ALPHA = 0.45f
@@ -218,14 +211,8 @@ private fun LibraryScreenContent(
     onFilePicked: (Uri, android.content.ContentResolver) -> Unit,
     onDeleteRequested: (BookWithProgress) -> Unit,
 ) {
-    var showFabMenu by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val pickerActions = rememberLibraryPickerActions(
-        context = LocalContext.current,
-        snackbarHostState = snackbarHostState,
-        onFolderPicked = onFolderPicked,
-        onFilePicked = onFilePicked,
-    )
+    var showFabMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier
@@ -241,11 +228,12 @@ private fun LibraryScreenContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            LibraryFabMenu(
+            LibraryFabMenuWithPickers(
                 expanded = showFabMenu,
                 onExpandChange = { showFabMenu = it },
-                onAddFolder = pickerActions.onAddFolder,
-                onAddFile = pickerActions.onAddFile,
+                snackbarHostState = snackbarHostState,
+                onFolderPicked = onFolderPicked,
+                onFilePicked = onFilePicked,
             )
         },
     ) { padding ->
@@ -267,12 +255,14 @@ private fun LibraryScreenContent(
 }
 
 @Composable
-private fun rememberLibraryPickerActions(
-    context: Context,
+private fun LibraryFabMenuWithPickers(
+    expanded: Boolean,
+    onExpandChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState,
-    onFolderPicked: (Uri, ContentResolver) -> Unit,
-    onFilePicked: (Uri, ContentResolver) -> Unit,
-): LibraryPickerActions {
+    onFolderPicked: (Uri, android.content.ContentResolver) -> Unit,
+    onFilePicked: (Uri, android.content.ContentResolver) -> Unit,
+) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val msgFilePickerUnavailable = stringResource(R.string.snackbar_file_picker_unavailable)
     val onPickerUnavailable: () -> Unit = {
@@ -287,7 +277,9 @@ private fun rememberLibraryPickerActions(
         uri?.let { onFilePicked(it, context.contentResolver) }
     }
 
-    return LibraryPickerActions(
+    LibraryFabMenu(
+        expanded = expanded,
+        onExpandChange = onExpandChange,
         onAddFolder = {
             launchSafPickerSafely(
                 launch = { folderPicker.launch(null) },
@@ -599,7 +591,7 @@ private fun handleBookClick(
     onBookClick: (Long) -> Unit,
     onUnavailableBookClicked: () -> Unit,
 ) {
-    if (bookWithProgress.isAvailable) {
+    if (bookWithProgress.book.isAvailable) {
         onBookClick(bookWithProgress.book.id)
     } else {
         onUnavailableBookClicked()
@@ -621,7 +613,7 @@ private fun rememberCardState(
         isPlaying = isActive && playbackStatus.isPlaying,
         isHighlighted = isHighlighted,
         onCoverClick = when {
-            !bookWithProgress.isAvailable -> null
+            !bookWithProgress.book.isAvailable -> null
             isActive && playbackStatus.isMediaLoaded -> onTogglePlayPause
             isActive -> ({ onPrepareAndPlay(bookId) })
             else -> null
@@ -717,7 +709,7 @@ private fun BookCard(
                     Modifier
                 },
             )
-            .alpha(if (uiState.bookWithProgress.isAvailable) 1f else UNAVAILABLE_BOOK_ALPHA)
+            .alpha(if (uiState.bookWithProgress.book.isAvailable) 1f else UNAVAILABLE_BOOK_ALPHA)
             .testTag("book_card_${book.id}")
             .combinedClickable(
                 onClick = onClick,
