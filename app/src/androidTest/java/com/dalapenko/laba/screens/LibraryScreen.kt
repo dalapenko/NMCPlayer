@@ -28,11 +28,11 @@ class LibraryScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
         hasTestTag("sort_button")
     }
 
-    val sortMenu: KNode = child {
+    val sortMenu: KNode = onNode {
         hasTestTag("sort_menu")
     }
 
-    fun sortOption(option: LibrarySortOption): KNode = child {
+    fun sortOption(option: LibrarySortOption): KNode = onNode {
         hasTestTag("sort_option_${option.name}")
     }
 

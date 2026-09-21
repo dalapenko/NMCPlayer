@@ -1,5 +1,3 @@
-<div align="center">
-
 # 📚 Laba
 
 **Offline Audiobook Player for Android**
@@ -7,15 +5,11 @@
 A clean, distraction-free audiobook player that works entirely offline.
 No accounts. No cloud. Just your books.
 
-<br/>
-
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://android.com)
 [![API 27+](https://img.shields.io/badge/Min%20SDK-API%2027-blue)](https://developer.android.com/about/versions/oreo)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.x-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-</div>
 
 ---
 
