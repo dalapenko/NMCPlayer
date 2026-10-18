@@ -5,13 +5,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.rememberNavBackStack
 import com.dalapenko.laba.feature.settings.SettingsViewModel
 import com.dalapenko.laba.feature.settings.ThemeMode
 import com.dalapenko.laba.navigation.AppNavHost
+import com.dalapenko.laba.navigation.Library
 import com.dalapenko.laba.ui.theme.LabaTheme
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -31,8 +33,8 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.DARK -> true
             }
             LabaTheme(darkTheme = darkTheme) {
-                Surface {
-                    AppNavHost(rememberNavController())
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    AppNavHost(rememberNavBackStack(Library))
                 }
             }
         }

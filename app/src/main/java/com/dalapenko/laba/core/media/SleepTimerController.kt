@@ -17,6 +17,9 @@ data class SleepTimerState(
     val isEndOfChapterMode: Boolean = false,
 )
 
+internal fun remainingPlaybackTimeMs(durationMs: Long, currentPositionMs: Long, playbackSpeed: Float): Long =
+    ((durationMs - currentPositionMs).coerceAtLeast(0L) / playbackSpeed).toLong()
+
 /**
  * Singleton controller for the Player screen's sleep timer.
  *
@@ -60,7 +63,7 @@ class SleepTimerController(
         val startIndex = initial.currentMediaItemIndex
         _state.value = SleepTimerState(
             isActive = true,
-            remainingMs = (initial.durationMs - initial.currentPositionMs).coerceAtLeast(0L),
+            remainingMs = remainingPlaybackTimeMs(initial.durationMs, initial.currentPositionMs, initial.playbackSpeed),
             isEndOfChapterMode = true,
         )
         timerJob = scope.launch {
@@ -84,7 +87,11 @@ class SleepTimerController(
                 }
 
                 _state.value = _state.value.copy(
-                    remainingMs = (current.durationMs - current.currentPositionMs).coerceAtLeast(0L),
+                    remainingMs = remainingPlaybackTimeMs(
+                        current.durationMs,
+                        current.currentPositionMs,
+                        current.playbackSpeed,
+                    ),
                 )
             }
             _state.value = SleepTimerState()

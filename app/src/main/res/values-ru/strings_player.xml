@@ -1,0 +1,16 @@
+<resources>
+    <string name="player_action_speed">Скорость</string>
+    <string name="player_action_files">Файлы</string>
+    <string name="player_files_title">Файлы</string>
+    <string name="player_files_empty">Нет доступных дорожек.</string>
+    <string name="player_now_listening">Сейчас слушаете</string>
+    <string name="player_more_options">Дополнительные действия</string>
+    <string name="player_action_timer">Таймер</string>
+    <string name="player_files_count">Файлы · %1$d</string>
+    <string name="player_file_current_name">%1$s · Сейчас</string>
+    <string name="player_file_position">%1$d из %2$d</string>
+    <string name="player_listened_percent">Прослушано: %1$d%%</string>
+    <string name="player_time_remaining">Осталось: %1$s</string>
+    <string name="cd_close">Закрыть</string>
+    <string name="player_close">Закрыть плеер</string>
+</resources>

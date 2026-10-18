@@ -1,6 +1,6 @@
-# 📚 Laba
+# 📚 NMCPlayer
 
-**Offline Audiobook Player for Android**
+**None Music Content · Offline Audiobook Player for Android**
 
 A clean, distraction-free audiobook player that works entirely offline.
 No accounts. No cloud. Just your books.
@@ -13,12 +13,6 @@ No accounts. No cloud. Just your books.
 
 ---
 
-## Screenshots
-
-| Library                                      | Player                                     | Chapter Select                                 | Settings                                       |
-|----------------------------------------------|--------------------------------------------|------------------------------------------------|------------------------------------------------|
-| ![Library](./assets/screenshots/library.jpg) | ![Player](./assets/screenshots/player.jpg) | ![Chapters](./assets/screenshots/chapters.jpg) | ![Settings](./assets/screenshots/settings.jpg) |
-
 ---
 
 ## Features
@@ -27,18 +21,20 @@ No accounts. No cloud. Just your books.
 - **Add books from a folder** — recursively scans for audio files with natural chapter ordering
 - **Add individual files** — pick a single audio file directly
 - **Cover art** — extracted automatically from embedded tags or folder images; falls back to stylized initials
-- **Reading progress** — per-book progress bar showing how far you've listened
 - **Unavailable books** — files that have been moved or deleted are shown dimmed, not deleted
 - **Long-press to remove** — optionally delete the source files alongside the library entry
+- **Search and filters** — find books by title or author; filter by listening progress
+- **Adaptive layout** — split controls and library content on wide screens, with multi-column book cards when space allows
+- **Reading progress** — per-book progress bar showing how far you've listened
 - **Pull-to-refresh** — re-scans availability and refreshes metadata
 
 ### Player
 - **Background playback** — keeps playing when you lock your screen or switch apps
-- **Playback controls** — play/pause, previous/next track, rewind/forward 10 seconds
-- **Seek bar** — drag to any position within the current track
-- **Playback speed** — adjustable from 0.5× to 2.0× in 0.05× steps
-- **Chapter list** — bottom sheet showing all tracks; tap to jump instantly
-- **Portrait & landscape** — fully responsive layout for both orientations
+- **Playback controls** — play/pause and 10-second seek; previous/next buttons appear for multi-file books
+- **Track and book progress** — seek within the current file and see listened percentage plus time remaining at playback speed
+- **Playback speed and sleep timer** — 0.5×–2.0× speed in 0.05× steps, plus fixed-duration or end-of-track timers
+- **File list** — bottom sheet on phones, right-side modal on foldables, and a supporting pane on tablets
+- **Responsive player** — 316dp cover with split controls on wide screens
 - **Progress saving** — your position is saved automatically and restored on next open
 
 ### Settings
@@ -50,17 +46,17 @@ No accounts. No cloud. Just your books.
 
 ## Tech Stack
 
-| Layer        | Technology                             |
-|--------------|----------------------------------------|
-| UI           | Jetpack Compose + Material 3           |
-| Architecture | MVVM · StateFlow · Repository          |
-| DI           | Koin 4.x                               |
-| Media        | Media3 ExoPlayer + MediaSessionService |
-| Database     | Room (KSP)                             |
-| Storage      | DataStore Preferences                  |
-| Background   | WorkManager                            |
-| Images       | Coil                                   |
-| Navigation   | Navigation Compose (type-safe)         |
+| Layer        | Technology                                              |
+|--------------|---------------------------------------------------------|
+| UI           | Jetpack Compose + Material 3                            |
+| Architecture | MVVM · StateFlow · Repository                           |
+| DI           | Koin 4.x                                                |
+| Media        | Media3 ExoPlayer + MediaSessionService                  |
+| Database     | Room (KSP)                                              |
+| Storage      | DataStore Preferences                                   |
+| Background   | WorkManager                                             |
+| Images       | Coil                                                    |
+| Navigation   | Navigation 3 · Material adaptive supporting-pane scenes |
 
 ---
 
@@ -95,8 +91,8 @@ Any audio format supported by ExoPlayer — including MP3, M4A, M4B, AAC, OGG, F
 ### Add Your First Book
 
 1. Open the app — your library starts empty.
-2. Tap **+** in the top-right corner.
-3. Choose **Add Folder** to import an entire audiobook directory, or **Add File** for a single file.
+2. Tap **Add audio** at the bottom of the empty library.
+3. Choose **Add Folder** to import an audiobook directory, or **Add File** for one audio file.
 4. Grant storage access when prompted.
 5. Tap the book cover to start listening.
 
@@ -124,7 +120,7 @@ app/src/main/kotlin/com/dalapenko/laba/
 
 ## Architecture
 
-Laba follows a single-module, package-by-feature structure with a strict MVVM layering:
+NMCPlayer follows a single-module, package-by-feature structure with a strict MVVM layering:
 
 ```
 UI (Compose) ──► ViewModel (StateFlow) ──► Repository ──► Room / DataStore

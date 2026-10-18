@@ -1,7 +1,10 @@
 package com.dalapenko.laba
 
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.filters.LargeTest
 import com.dalapenko.laba.screens.ChapterBottomSheet
 import com.dalapenko.laba.screens.LibraryScreen
@@ -62,12 +65,11 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
                 bookCard(bookId).performClick()
             }
 
-            // Wait for the slideInVertically + fadeIn navigation animation to complete
-            // and for PlayerViewModel.loadBook() to finish (isInitializing = false).
+            // Wait for the Navigation 3 transition and for PlayerViewModel.loadBook() to finish.
             // The app automatically starts playback (autoPlay=true by default).
             withScreen<PlayerScreen> {
                 flakySafely { playerBookTitle.assertIsDisplayed() }
-                playerBookTitle.assertTextContains(book.bookEntity.title)
+                playerBookName.assertTextContains(book.bookEntity.title)
             }
             
             // Verify playback has started automatically
@@ -78,10 +80,12 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
 
         step("3. Adjust playback speed to 1.5×") {
             withScreen<PlayerScreen> {
-                flakySafely { speedSlider.assertIsDisplayed() }
-                speedSlider.performSemanticsAction(SemanticsActions.SetProgress) { it(1.5f) }
-                speedText.assertTextContains("1.5", substring = true)
+                speedControl.performClick()
             }
+            composeTestRule.onNodeWithTag("speed_increase").assertIsDisplayed()
+            repeat(10) { composeTestRule.onNodeWithTag("speed_increase").performClick() }
+            composeTestRule.onNodeWithTag("speed_value").assertTextContains("1.5", substring = true)
+            composeTestRule.onNodeWithTag("speed_done").performClick()
         }
 
         step("4. Navigate to next chapter") {
@@ -117,10 +121,8 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
         }
 
         step("6. Open chapter list and jump to chapter 3") {
-            withScreen<PlayerScreen> {
-                chaptersButton.performClick()
-            }
-
+            withScreen<PlayerScreen> { overflowButton.performClick() }
+            composeTestRule.onNodeWithTag("chapters_button").performClick()
             withScreen<ChapterBottomSheet> {
                 flakySafely { chapterItem(2).assertIsDisplayed() }
                 chapterItem(2).performClick()
@@ -162,10 +164,8 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
         }
 
         step("8. Simulate progress save, return to library, verify progress is displayed") {
-            // First, navigate back to library
-            withScreen<PlayerScreen> {
-                backButton.performClick()
-            }
+            // Return to the library with the visible app-bar back arrow
+            composeTestRule.onNodeWithTag("back_button").performClick()
 
             // Stop playback to clear currentBookId. This ensures LibraryViewModel
             // will read progress from DB instead of live player state.
@@ -205,8 +205,10 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
 
             withScreen<PlayerScreen> {
                 flakySafely { playerBookTitle.assertIsDisplayed() }
-                speedText.assertTextContains("1.5", substring = true)
+                speedControl.performClick()
             }
+            composeTestRule.onNodeWithTag("speed_value").assertTextContains("1.5", substring = true)
+            composeTestRule.onNodeWithTag("speed_done").performClick()
         }
     }
 }

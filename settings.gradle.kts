@@ -24,5 +24,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "laba"
+rootProject.name = "NMCPlayer"
 include(":app")

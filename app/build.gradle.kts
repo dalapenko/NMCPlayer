@@ -24,8 +24,8 @@ rootProject.file("local.properties").also { f ->
 // versionCode = major * 10_000 + minor * 100 + patch, so it strictly increases
 // with every release as required by https://developer.android.com/studio/publish/versioning
 val versionMajor = 1
-val versionMinor = 4
-val versionPatch = 4
+val versionMinor = 5
+val versionPatch = 0
 
 android {
     namespace = "com.dalapenko.laba"
@@ -88,7 +88,7 @@ android {
 }
 
 base {
-    archivesName.set("laba")
+    archivesName.set("NMCPlayer")
 }
 
 tasks.whenTaskAdded {
@@ -131,8 +131,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Navigation
-    implementation(libs.androidx.navigation.compose)
-
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.adaptive.navigation3)
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

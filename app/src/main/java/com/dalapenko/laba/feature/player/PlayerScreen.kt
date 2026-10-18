@@ -1,51 +1,61 @@
 package com.dalapenko.laba.feature.player
 
-import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,38 +66,44 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.dalapenko.laba.R
 import com.dalapenko.laba.core.media.PlayerState
+import com.dalapenko.laba.core.media.remainingPlaybackTimeMs
 import kotlinx.coroutines.flow.Flow
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 import java.util.Locale
 import kotlin.math.roundToInt
 
+private val PLAYER_WIDE_LAYOUT_MIN_WIDTH = 720.dp
+private val PLAYER_COVER_SIZE = 240.dp
+private val WIDE_PLAYER_COVER_SIZE = 224.dp
+private val WIDE_PLAYER_COVER_METADATA_SPACE = 120.dp
+private val PLAYER_CARD_CORNER = 20.dp
 private val LANDSCAPE_TRANSPORT_ICON_SIZE = 32.dp
 private val LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE = 56.dp
-private val LANDSCAPE_TRANSPORT_SPACING = 4.dp
 private val PORTRAIT_TRANSPORT_ICON_SIZE = 36.dp
 private val PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE = 64.dp
-private val PORTRAIT_TRANSPORT_SPACING = 8.dp
-
-/** Derived, display-ready playback data shared by the landscape and portrait layouts. */
+private const val PLAYER_PANEL_MAX_HEIGHT_FRACTION = 0.82f
 private data class PlaybackDisplayState(
     val title: String,
+    val author: String?,
     val coverUri: String?,
     val trackFileName: String?,
+    val trackNumber: Int,
+    val trackCount: Int,
     val position: Float,
     val duration: Float,
     val currentPositionMs: Long,
@@ -96,11 +112,12 @@ private data class PlaybackDisplayState(
     val seekPosition: Float,
     val isPlaying: Boolean,
     val playbackSpeed: Float,
+    val progress: Float,
+    val remainingMs: Long,
     val isPreviousEnabled: Boolean,
     val isNextEnabled: Boolean,
 )
 
-/** Resolved transport-control callbacks, closed over the current track index and seek state. */
 private data class TransportActions(
     val onPrevious: () -> Unit,
     val onRewind: () -> Unit,
@@ -109,7 +126,6 @@ private data class TransportActions(
     val onNext: () -> Unit,
     val onSeekChange: (Float) -> Unit,
     val onSeekFinished: () -> Unit,
-    val onSetSpeed: (Float) -> Unit,
 )
 
 @Composable
@@ -117,21 +133,26 @@ fun PlayerScreen(
     bookId: Long,
     autoPlay: Boolean = true,
     onBack: () -> Unit,
+    onOpenFiles: () -> Unit,
+    filesInPane: Boolean = false,
     viewModel: PlayerViewModel = koinViewModel { parametersOf(bookId, autoPlay) },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
+    var unavailableTrack by remember { mutableStateOf<PlayerEvent.TrackUnavailable?>(null) }
     PlayerEventEffect(
         events = viewModel.events,
-        snackbarHostState = snackbarHostState,
         onBack = onBack,
+        onTrackUnavailable = { unavailableTrack = it },
     )
-
     PlayerScaffold(
+        bookId = bookId,
+        filesInPane = filesInPane,
         uiState = uiState,
-        snackbarHostState = snackbarHostState,
         onBack = onBack,
+        onOpenFiles = onOpenFiles,
+        trackUnavailable = unavailableTrack,
+        onDismissTrackUnavailable = { unavailableTrack = null },
+        onRetryTrack = viewModel::retryTrack,
         onSeekTo = viewModel::seekTo,
         onSkipToTrack = viewModel::skipToTrack,
         onSeekBack = viewModel::seekBack,
@@ -147,35 +168,102 @@ fun PlayerScreen(
 @Composable
 private fun PlayerEventEffect(
     events: Flow<PlayerEvent>,
-    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
+    onTrackUnavailable: (PlayerEvent.TrackUnavailable) -> Unit,
 ) {
-    val fallbackTrackNameTemplate = stringResource(R.string.fallback_track_name)
-    val trackUnavailableTemplate = stringResource(R.string.snackbar_track_unavailable)
-
-    LaunchedEffect(Unit) {
+    LaunchedEffect(events) {
         events.collect { event ->
             when (event) {
                 PlayerEvent.ClosePlayer -> onBack()
-                is PlayerEvent.TrackUnavailable -> {
-                    val name = event.trackName
-                        ?: String.format(fallbackTrackNameTemplate, event.trackIndex + 1)
-                    snackbarHostState.showSnackbar(
-                        message = String.format(trackUnavailableTemplate, name),
-                        duration = SnackbarDuration.Short,
-                    )
-                }
+                is PlayerEvent.TrackUnavailable -> onTrackUnavailable(event)
             }
         }
     }
 }
 
+@Suppress("LongMethod")
+@Composable
+private fun AudioFileErrorContent(
+    fileName: String,
+    canRetry: Boolean,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+    onChooseAnotherFile: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.player_audio_error_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.testTag("player_audio_error_close_button")) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.player_audio_error_close))
+            }
+        }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.size(
+                    56.dp,
+                ).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+        Text(
+            text = fileName,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().testTag("player_audio_error_filename"),
+        )
+        Text(
+            text = stringResource(R.string.player_audio_error_message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        TextButton(
+            onClick = onChooseAnotherFile,
+            modifier = Modifier.fillMaxWidth().testTag("player_audio_error_choose_file_button"),
+        ) {
+            Text(stringResource(R.string.player_audio_error_choose_file))
+        }
+        Button(
+            onClick = onRetry,
+            enabled = canRetry,
+            modifier = Modifier.fillMaxWidth().testTag("player_audio_error_retry_button"),
+        ) {
+            Text(stringResource(R.string.player_audio_error_retry))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod") // The player scaffold coordinates responsive overlays and playback controls.
 @Composable
 private fun PlayerScaffold(
+    bookId: Long,
+    filesInPane: Boolean,
     uiState: PlayerUiState,
-    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
+    onOpenFiles: () -> Unit,
+    trackUnavailable: PlayerEvent.TrackUnavailable?,
+    onDismissTrackUnavailable: () -> Unit,
+    onRetryTrack: (Int) -> Unit,
     onSeekTo: (Long) -> Unit,
     onSkipToTrack: (Int) -> Unit,
     onSeekBack: () -> Unit,
@@ -187,207 +275,319 @@ private fun PlayerScaffold(
     onCancelSleepTimer: () -> Unit,
 ) {
     val playerState = uiState.playerState
-    val showChapters = remember { mutableStateOf(false) }
-    val showSleepTimer = remember { mutableStateOf(false) }
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    Scaffold(
-        modifier = Modifier.testTag("player_screen"),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            PlayerTopBar(
-                title = uiState.book?.title ?: "",
-                chaptersEnabled = uiState.tracks.size > 1,
-                sleepTimerActive = uiState.sleepTimerState.isActive,
-                onBack = onBack,
-                onShowChapters = { showChapters.value = true },
-                onShowSleepTimer = { showSleepTimer.value = true },
+    var showChapters by remember { mutableStateOf(false) }
+    var showSleepTimer by remember { mutableStateOf(false) }
+    var showFiles by remember { mutableStateOf(false) }
+    var showSpeed by remember { mutableStateOf(false) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val isWide = maxWidth >= PLAYER_WIDE_LAYOUT_MIN_WIDTH
+        val panelMaxHeight = maxHeight * PLAYER_PANEL_MAX_HEIGHT_FRACTION
+        val openFiles = { if (filesInPane) onOpenFiles() else showFiles = true }
+        Scaffold(
+            modifier = Modifier.testTag("player_screen"),
+            topBar = {
+                PlayerTopBar(
+                    onBack = onBack,
+                    onOpenFiles = openFiles,
+                    onShowChapters = { showChapters = true },
+                    onShowSleepTimer = { showSleepTimer = true },
+                    chaptersEnabled = uiState.tracks.size > 1,
+                    sleepTimerActive = uiState.sleepTimerState.isActive,
+                )
+            },
+        ) { padding ->
+            if (uiState.isLoading || uiState.isInitializing) {
+                LoadingIndicator(padding)
+            } else {
+                PlayerContent(
+                    uiState = uiState,
+                    playerState = playerState,
+                    isWide = isWide,
+                    padding = padding,
+                    onOpenFiles = openFiles,
+                    onShowSleepTimer = { showSleepTimer = true },
+                    onShowSpeed = { showSpeed = true },
+                    onSeekTo = onSeekTo,
+                    onSkipToTrack = onSkipToTrack,
+                    onSeekBack = onSeekBack,
+                    onSeekForward = onSeekForward,
+                    onTogglePlayPause = onTogglePlayPause,
+                )
+            }
+        }
+        if (showFiles) {
+            if (maxWidth < 600.dp) {
+                ModalBottomSheet(onDismissRequest = { showFiles = false }) {
+                    PlayerFilesScreen(
+                        bookId = bookId,
+                        onBack = { showFiles = false },
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
+                    )
+                }
+            } else {
+                Dialog(
+                    onDismissRequest = { showFiles = false },
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                        Surface(
+                            modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight),
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 6.dp,
+                        ) {
+                            PlayerFilesScreen(
+                                bookId = bookId,
+                                onBack = { showFiles = false },
+                                maxPanelHeight = panelMaxHeight,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        trackUnavailable?.let { error ->
+            val fallbackName = stringResource(R.string.fallback_track_name)
+            val fileName = error.trackName ?: String.format(fallbackName, error.trackIndex + 1)
+            val canRetry = error.trackIndex in uiState.tracks.indices
+            val retry = {
+                onRetryTrack(error.trackIndex)
+                onDismissTrackUnavailable()
+            }
+            val chooseAnotherFile = {
+                onDismissTrackUnavailable()
+                openFiles()
+            }
+            if (maxWidth < 600.dp && !filesInPane) {
+                ModalBottomSheet(
+                    onDismissRequest = onDismissTrackUnavailable,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("player_audio_error_sheet"),
+                ) {
+                    AudioFileErrorContent(fileName, canRetry, onDismissTrackUnavailable, retry, chooseAnotherFile)
+                }
+            } else {
+                Dialog(
+                    onDismissRequest = onDismissTrackUnavailable,
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                        Surface(
+                            modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight)
+                                .testTag("player_audio_error_sheet"),
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 6.dp,
+                        ) {
+                            AudioFileErrorContent(
+                                fileName = fileName,
+                                canRetry = canRetry,
+                                onDismiss = onDismissTrackUnavailable,
+                                onRetry = retry,
+                                onChooseAnotherFile = chooseAnotherFile,
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (showChapters) {
+            ChapterBottomSheet(
+                tracks = uiState.tracks,
+                currentTrackIndex = playerState.currentMediaItemIndex,
+                onTrackSelected = { index ->
+                    onSkipToTrack(index)
+                    showChapters = false
+                },
+                onDismiss = { showChapters = false },
             )
-        },
-    ) { padding ->
-        if (uiState.isLoading || uiState.isInitializing) {
-            LoadingIndicator(padding)
-        } else {
-            PlayerContent(
-                uiState = uiState,
-                playerState = playerState,
-                isLandscape = isLandscape,
-                padding = padding,
-                onSeekTo = onSeekTo,
-                onSkipToTrack = onSkipToTrack,
-                onSeekBack = onSeekBack,
-                onSeekForward = onSeekForward,
-                onTogglePlayPause = onTogglePlayPause,
-                onSetSpeed = onSetSpeed,
+        }
+        if (showSleepTimer) {
+            SleepTimerBottomSheet(
+                isWide = maxWidth >= 600.dp,
+                isActive = uiState.sleepTimerState.isActive,
+                remainingMs = uiState.sleepTimerState.remainingMs,
+                remainingChapterMs = remainingPlaybackTimeMs(
+                    playerState.durationMs,
+                    playerState.currentPositionMs,
+                    playerState.playbackSpeed,
+                ),
+                initialFixedMinutes = uiState.rememberedSleepTimerMinutes,
+                onStartFixedDuration = {
+                    onStartFixedDuration(it)
+                    showSleepTimer = false
+                },
+                onStartEndOfChapter = {
+                    onStartEndOfChapter()
+                    showSleepTimer = false
+                },
+                onCancel = {
+                    onCancelSleepTimer()
+                    showSleepTimer = false
+                },
+                onDismiss = { showSleepTimer = false },
+            )
+        }
+        if (showSpeed) {
+            SpeedBottomSheet(
+                currentSpeed = playerState.playbackSpeed,
+                isWide = maxWidth >= 600.dp,
+                onSpeedChanged = onSetSpeed,
+                onDismiss = { showSpeed = false },
             )
         }
     }
-
-    PlayerBottomSheets(
-        uiState = uiState,
-        playerState = playerState,
-        onSkipToTrack = onSkipToTrack,
-        onStartFixedDuration = onStartFixedDuration,
-        onStartEndOfChapter = onStartEndOfChapter,
-        onCancelSleepTimer = onCancelSleepTimer,
-        showChapters = showChapters,
-        showSleepTimer = showSleepTimer,
-    )
 }
 
-@Composable
-private fun PlayerBottomSheets(
-    uiState: PlayerUiState,
-    playerState: PlayerState,
-    onSkipToTrack: (Int) -> Unit,
-    onStartFixedDuration: (Int) -> Unit,
-    onStartEndOfChapter: () -> Unit,
-    onCancelSleepTimer: () -> Unit,
-    showChapters: MutableState<Boolean>,
-    showSleepTimer: MutableState<Boolean>,
-) {
-    if (showChapters.value) {
-        ChapterBottomSheet(
-            tracks = uiState.tracks,
-            currentTrackIndex = playerState.currentMediaItemIndex,
-            onTrackSelected = { index ->
-                onSkipToTrack(index)
-                showChapters.value = false
-            },
-            onDismiss = { showChapters.value = false },
-        )
-    }
-
-    if (showSleepTimer.value) {
-        SleepTimerBottomSheet(
-            isActive = uiState.sleepTimerState.isActive,
-            remainingMs = uiState.sleepTimerState.remainingMs,
-            remainingChapterMs = (playerState.durationMs - playerState.currentPositionMs).coerceAtLeast(0L),
-            initialFixedMinutes = uiState.rememberedSleepTimerMinutes,
-            onStartFixedDuration = { minutes ->
-                onStartFixedDuration(minutes)
-                showSleepTimer.value = false
-            },
-            onStartEndOfChapter = {
-                onStartEndOfChapter()
-                showSleepTimer.value = false
-            },
-            onCancel = {
-                onCancelSleepTimer()
-                showSleepTimer.value = false
-            },
-            onDismiss = { showSleepTimer.value = false },
-        )
-    }
-}
-
-@Composable
-private fun LoadingIndicator(padding: PaddingValues) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator()
-    }
-}
-
+@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerTopBar(
-    title: String,
-    chaptersEnabled: Boolean,
-    sleepTimerActive: Boolean,
     onBack: () -> Unit,
+    onOpenFiles: () -> Unit,
     onShowChapters: () -> Unit,
     onShowSleepTimer: () -> Unit,
+    chaptersEnabled: Boolean,
+    sleepTimerActive: Boolean,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
             Text(
-                text = title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                stringResource(R.string.player_now_listening),
                 modifier = Modifier.testTag("player_book_title"),
             )
         },
         navigationIcon = {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.testTag("back_button"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.cd_back),
-                )
+            IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
             }
         },
         actions = {
-            IconButton(
-                onClick = onShowSleepTimer,
-                modifier = Modifier.testTag("sleep_timer_button"),
-            ) {
-                Icon(
-                    Icons.Outlined.Bedtime,
-                    contentDescription = stringResource(R.string.cd_sleep_timer),
-                    tint = if (sleepTimerActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                )
-            }
-            IconButton(
-                onClick = onShowChapters,
-                enabled = chaptersEnabled,
-                modifier = Modifier.testTag("chapters_button"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ListAlt,
-                    contentDescription = stringResource(R.string.cd_show_chapters),
-                )
+            Box {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.testTag("player_overflow_button")) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.player_more_options))
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.player_close)) },
+                        onClick = {
+                            menuExpanded = false
+                            onBack()
+                        },
+                        modifier = Modifier.testTag("player_close_menu_item"),
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.player_action_files)) },
+                        leadingIcon = { Icon(Icons.Outlined.FolderOpen, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onOpenFiles()
+                        },
+                        modifier = Modifier.testTag("player_files_menu_item"),
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.cd_sleep_timer)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Bedtime,
+                                contentDescription = null,
+                                tint = if (sleepTimerActive) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onShowSleepTimer()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.cd_show_chapters)) },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null) },
+                        enabled = chaptersEnabled,
+                        onClick = {
+                            menuExpanded = false
+                            onShowChapters()
+                        },
+                        modifier = Modifier.testTag("chapters_button"),
+                    )
+                }
             }
         },
     )
 }
 
+@Suppress("LongMethod")
 @Composable
 private fun PlayerContent(
     uiState: PlayerUiState,
     playerState: PlayerState,
-    isLandscape: Boolean,
+    isWide: Boolean,
     padding: PaddingValues,
+    onOpenFiles: () -> Unit,
+    onShowSleepTimer: () -> Unit,
+    onShowSpeed: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onSkipToTrack: (Int) -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onTogglePlayPause: () -> Unit,
-    onSetSpeed: (Float) -> Unit,
 ) {
-    val currentTrackIndex = playerState.currentMediaItemIndex
-        .coerceIn(0, uiState.tracks.lastIndex.coerceAtLeast(0))
-    val currentTrack = uiState.tracks.getOrNull(currentTrackIndex)
+    val tracks = uiState.tracks
+    val trackIndex = playerState.currentMediaItemIndex.coerceIn(0, tracks.lastIndex.coerceAtLeast(0))
+    val track = tracks.getOrNull(trackIndex)
+    val trackStarts = remember(tracks) {
+        LongArray(tracks.size + 1).also { starts ->
+            tracks.forEachIndexed { index, item -> starts[index + 1] = starts[index] + item.durationMs }
+        }
+    }
+    val totalDurationMs = (uiState.book?.totalDurationMs ?: 0L)
+        .takeIf { it > 0L }
+        ?: trackStarts.last()
+    val listenedMs = (trackStarts[trackIndex] + playerState.currentPositionMs)
+        .coerceIn(0L, totalDurationMs.coerceAtLeast(playerState.currentPositionMs))
+    val progress = if (totalDurationMs > 0) (listenedMs.toFloat() / totalDurationMs).coerceIn(0f, 1f) else 0f
+    val remainingMs = remainingPlaybackTimeMs(totalDurationMs, listenedMs, playerState.playbackSpeed)
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
-
-    val displayState = PlaybackDisplayState(
-        title = uiState.book?.title ?: "",
+    val durationMs = playerState.durationMs.takeIf { it > 0L } ?: track?.durationMs ?: 0L
+    val state = PlaybackDisplayState(
+        title = uiState.book?.title.orEmpty(),
+        author = uiState.book?.author,
         coverUri = uiState.book?.coverUri,
-        trackFileName = currentTrack?.fileName,
+        trackFileName = track?.fileName,
+        trackNumber = trackIndex + 1,
+        trackCount = tracks.size,
         position = playerState.currentPositionMs.toFloat(),
-        duration = playerState.durationMs.toFloat().coerceAtLeast(1f),
+        duration = durationMs.toFloat().coerceAtLeast(1f),
         currentPositionMs = playerState.currentPositionMs,
-        durationMs = playerState.durationMs,
+        durationMs = durationMs,
         isSeeking = isSeeking,
         seekPosition = seekPosition,
         isPlaying = playerState.isPlaying,
         playbackSpeed = playerState.playbackSpeed,
-        isPreviousEnabled = uiState.tracks.size > 1 && currentTrackIndex > 0,
-        isNextEnabled = uiState.tracks.size > 1 && currentTrackIndex < uiState.tracks.lastIndex,
+        progress = progress,
+        remainingMs = remainingMs,
+        isPreviousEnabled = tracks.size > 1 && trackIndex > 0,
+        isNextEnabled = tracks.size > 1 && trackIndex < tracks.lastIndex,
     )
-    val transportActions = TransportActions(
-        onPrevious = { onSkipToTrack(currentTrackIndex - 1) },
+    val actions = TransportActions(
+        onPrevious = { onSkipToTrack(trackIndex - 1) },
         onRewind = onSeekBack,
         onPlayPause = onTogglePlayPause,
         onForward = onSeekForward,
-        onNext = { onSkipToTrack(currentTrackIndex + 1) },
+        onNext = { onSkipToTrack(trackIndex + 1) },
         onSeekChange = {
             isSeeking = true
             seekPosition = it
@@ -396,150 +596,157 @@ private fun PlayerContent(
             onSeekTo(seekPosition.toLong())
             isSeeking = false
         },
-        onSetSpeed = onSetSpeed,
     )
-
-    if (isLandscape) {
-        LandscapePlayerContent(displayState, transportActions, padding)
+    if (isWide) {
+        WidePlayerContent(state, actions, padding, onOpenFiles, onShowSpeed, onShowSleepTimer)
     } else {
-        PortraitPlayerContent(displayState, transportActions, padding)
+        PhonePlayerContent(state, actions, padding, onOpenFiles, onShowSpeed, onShowSleepTimer)
     }
 }
 
 @Composable
-private fun LandscapePlayerContent(
+private fun PhonePlayerContent(
     state: PlaybackDisplayState,
     actions: TransportActions,
     padding: PaddingValues,
+    onOpenFiles: () -> Unit,
+    onShowSpeed: () -> Unit,
+    onShowSleepTimer: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverArt(
-            coverUri = state.coverUri,
-            title = state.title,
-            modifier = Modifier
-                .fillMaxHeight(LANDSCAPE_COVER_HEIGHT_FRACTION)
-                .aspectRatio(1f),
-        )
-
-        Spacer(Modifier.width(20.dp))
-
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val availableWidth = maxWidth
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            TrackInfo(
-                title = state.title,
-                trackFileName = state.trackFileName,
-                titleStyle = MaterialTheme.typography.titleLarge,
-            )
-
+            Spacer(Modifier.height(8.dp))
+            CoverArt(state.coverUri, state.title, Modifier.size(minOf(PLAYER_COVER_SIZE, availableWidth)))
             Spacer(Modifier.height(12.dp))
-
-            ProgressSection(state = state, onSeekChange = actions.onSeekChange, onSeekFinished = actions.onSeekFinished)
-
+            BookInfo(state)
             Spacer(Modifier.height(8.dp))
-
+            TrackInfo(state)
+            Spacer(Modifier.height(8.dp))
+            ProgressSection(state, actions.onSeekChange, actions.onSeekFinished, Modifier.padding(horizontal = 24.dp))
+            Spacer(Modifier.height(8.dp))
             TransportControls(
-                state = state,
-                actions = actions,
-                iconSize = LANDSCAPE_TRANSPORT_ICON_SIZE,
-                playButtonSize = LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE,
-                spacing = LANDSCAPE_TRANSPORT_SPACING,
+                state,
+                actions,
+                PORTRAIT_TRANSPORT_ICON_SIZE,
+                PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE,
+                Modifier.padding(horizontal = 12.dp),
             )
-
             Spacer(Modifier.height(8.dp))
-
-            SpeedControl(currentSpeed = state.playbackSpeed, onSpeedChanged = actions.onSetSpeed)
+            BookProgress(state, Modifier.padding(horizontal = 24.dp))
+            PlayerCards(state, onShowSpeed, onOpenFiles, onShowSleepTimer)
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun PortraitPlayerContent(
+private fun WidePlayerContent(
     state: PlaybackDisplayState,
     actions: TransportActions,
     padding: PaddingValues,
+    onOpenFiles: () -> Unit,
+    onShowSpeed: () -> Unit,
+    onShowSleepTimer: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(24.dp))
-
-        CoverArt(
-            coverUri = state.coverUri,
-            title = state.title,
-            modifier = Modifier
-                .fillMaxWidth(PORTRAIT_COVER_WIDTH_FRACTION)
-                .aspectRatio(1f),
+    BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val compact = maxHeight < 500.dp
+        val coverSize = minOf(
+            WIDE_PLAYER_COVER_SIZE,
+            (maxHeight - WIDE_PLAYER_COVER_METADATA_SPACE).coerceAtLeast(120.dp),
         )
-
-        Spacer(Modifier.height(24.dp))
-
-        TrackInfo(
-            title = state.title,
-            trackFileName = state.trackFileName,
-            titleStyle = MaterialTheme.typography.headlineSmall,
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        ProgressSection(state = state, onSeekChange = actions.onSeekChange, onSeekFinished = actions.onSeekFinished)
-
-        Spacer(Modifier.height(24.dp))
-
-        TransportControls(
-            state = state,
-            actions = actions,
-            iconSize = PORTRAIT_TRANSPORT_ICON_SIZE,
-            playButtonSize = PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE,
-            spacing = PORTRAIT_TRANSPORT_SPACING,
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        SpeedControl(currentSpeed = state.playbackSpeed, onSpeedChanged = actions.onSetSpeed)
+        val controlsScrollModifier = if (compact) Modifier else Modifier.verticalScroll(rememberScrollState())
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = if (compact) 0.dp else 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                CoverArt(state.coverUri, state.title, Modifier.size(coverSize))
+                Spacer(Modifier.height(12.dp))
+                BookInfo(state)
+            }
+            Spacer(Modifier.width(24.dp))
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight().then(controlsScrollModifier),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top,
+            ) {
+                TrackInfo(state, compact)
+                Spacer(Modifier.height(if (compact) 2.dp else 16.dp))
+                ProgressSection(state, actions.onSeekChange, actions.onSeekFinished)
+                Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
+                TransportControls(state, actions, LANDSCAPE_TRANSPORT_ICON_SIZE, LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE)
+                Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
+                BookProgress(state, stacked = !compact, compact = compact)
+                Spacer(Modifier.height(if (compact) 4.dp else 16.dp))
+                PlayerCards(state, onShowSpeed, onOpenFiles, onShowSleepTimer, compact = true)
+            }
+        }
     }
 }
 
 @Composable
-private fun TrackInfo(
-    title: String,
-    trackFileName: String?,
-    titleStyle: TextStyle,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+private fun BookInfo(state: PlaybackDisplayState) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = title,
-            style = titleStyle,
+            text = state.title,
+            style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("player_book_name"),
         )
-
-        if (trackFileName != null) {
-            Spacer(Modifier.height(4.dp))
+        state.author?.takeIf(String::isNotBlank)?.let {
             Text(
-                text = trackFileName,
+                it,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrackInfo(state: PlaybackDisplayState, compact: Boolean = false) {
+    val position = stringResource(R.string.player_file_position, state.trackNumber, state.trackCount)
+    if (compact) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (state.trackCount > 0) {
+                Text(position, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+            Text(
+                state.trackFileName.orEmpty(),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (state.trackCount > 0) {
+                Text(position, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+            Text(
+                state.trackFileName.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -554,27 +761,21 @@ private fun ProgressSection(
     onSeekFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val playbackPositionDesc = stringResource(R.string.cd_playback_position)
-    val displayedPositionMs = if (state.isSeeking) state.seekPosition.toLong() else state.currentPositionMs
-
-    Column(modifier = modifier.fillMaxWidth()) {
+    val description = stringResource(R.string.cd_playback_position)
+    val displayedPosition = if (state.isSeeking) state.seekPosition.toLong() else state.currentPositionMs
+    Column(modifier.fillMaxWidth()) {
         Slider(
-            value = if (state.isSeeking) state.seekPosition else state.position,
+            value = if (state.isSeeking) state.seekPosition else state.position.coerceIn(0f, state.duration),
             onValueChange = onSeekChange,
             onValueChangeFinished = onSeekFinished,
             valueRange = 0f..state.duration,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("position_slider")
-                .semantics { contentDescription = playbackPositionDesc },
+            modifier = Modifier.fillMaxWidth().testTag(
+                "position_slider",
+            ).semantics { contentDescription = description },
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(text = formatTime(displayedPositionMs), style = MaterialTheme.typography.labelSmall)
-            Text(text = formatTime(state.durationMs), style = MaterialTheme.typography.labelSmall)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatTime(displayedPosition), style = MaterialTheme.typography.labelSmall)
+            Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -585,7 +786,6 @@ private fun TransportControls(
     actions: TransportActions,
     iconSize: Dp,
     playButtonSize: Dp,
-    spacing: Dp,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -593,64 +793,54 @@ private fun TransportControls(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
     ) {
+        if (state.trackCount > 1) {
+            TransportIconButton(
+                Icons.Default.SkipPrevious,
+                stringResource(R.string.cd_previous_chapter),
+                iconSize,
+                "previous_chapter_button",
+                actions.onPrevious,
+                state.isPreviousEnabled,
+            )
+            Spacer(Modifier.width(4.dp))
+        }
         TransportIconButton(
-            icon = Icons.Default.SkipPrevious,
-            contentDescription = stringResource(R.string.cd_previous_chapter),
-            iconSize = iconSize,
-            testTag = "previous_chapter_button",
-            enabled = state.isPreviousEnabled,
-            onClick = actions.onPrevious,
+            Icons.Default.Replay10,
+            stringResource(R.string.cd_rewind_10),
+            iconSize,
+            "rewind_button",
+            actions.onRewind,
         )
-
-        Spacer(Modifier.width(spacing))
-
-        TransportIconButton(
-            icon = Icons.Default.Replay10,
-            contentDescription = stringResource(R.string.cd_rewind_10),
-            iconSize = iconSize,
-            testTag = "rewind_button",
-            onClick = actions.onRewind,
-        )
-
-        Spacer(Modifier.width(spacing))
-
+        Spacer(Modifier.width(8.dp))
         FilledIconButton(
             onClick = actions.onPlayPause,
-            modifier = Modifier
-                .size(playButtonSize)
-                .testTag("play_pause_button"),
+            modifier = Modifier.size(playButtonSize).testTag("play_pause_button"),
         ) {
             Icon(
-                imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (state.isPlaying) {
-                    stringResource(R.string.cd_pause)
-                } else {
-                    stringResource(R.string.cd_play)
-                },
+                if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = stringResource(if (state.isPlaying) R.string.cd_pause else R.string.cd_play),
                 modifier = Modifier.size(iconSize),
             )
         }
-
-        Spacer(Modifier.width(spacing))
-
+        Spacer(Modifier.width(8.dp))
         TransportIconButton(
-            icon = Icons.Default.Forward10,
-            contentDescription = stringResource(R.string.cd_forward_10),
-            iconSize = iconSize,
-            testTag = "forward_button",
-            onClick = actions.onForward,
+            Icons.Default.Forward10,
+            stringResource(R.string.cd_forward_10),
+            iconSize,
+            "forward_button",
+            actions.onForward,
         )
-
-        Spacer(Modifier.width(spacing))
-
-        TransportIconButton(
-            icon = Icons.Default.SkipNext,
-            contentDescription = stringResource(R.string.cd_next_chapter),
-            iconSize = iconSize,
-            testTag = "next_chapter_button",
-            enabled = state.isNextEnabled,
-            onClick = actions.onNext,
-        )
+        if (state.trackCount > 1) {
+            Spacer(Modifier.width(4.dp))
+            TransportIconButton(
+                Icons.Default.SkipNext,
+                stringResource(R.string.cd_next_chapter),
+                iconSize,
+                "next_chapter_button",
+                actions.onNext,
+                state.isNextEnabled,
+            )
+        }
     }
 }
 
@@ -663,21 +853,141 @@ private fun TransportIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    IconButton(
-        enabled = enabled,
-        onClick = onClick,
-        modifier = Modifier.testTag(testTag),
-    ) {
-        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(iconSize))
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.testTag(testTag)) {
+        Icon(icon, contentDescription, modifier = Modifier.size(iconSize))
     }
 }
 
 @Composable
-private fun CoverArt(
-    coverUri: String?,
-    title: String,
+private fun BookProgress(
+    state: PlaybackDisplayState,
     modifier: Modifier = Modifier,
+    stacked: Boolean = false,
+    compact: Boolean = false,
 ) {
+    val remaining = stringResource(R.string.player_time_remaining, formatTime(state.remainingMs))
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                stringResource(R.string.player_listened_percent, (state.progress * 100).roundToInt()),
+                style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+            )
+            if (!stacked) {
+                Text(
+                    remaining,
+                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        if (stacked) Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
+        LinearProgressIndicator(
+            progress = { state.progress },
+            modifier = Modifier.fillMaxWidth().testTag("book_progress_slider"),
+        )
+        if (stacked) {
+            Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
+            Text(
+                remaining,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.End,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerCards(
+    state: PlaybackDisplayState,
+    onShowSpeed: () -> Unit,
+    onOpenFiles: () -> Unit,
+    onShowSleepTimer: () -> Unit,
+    compact: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(
+            horizontal = 16.dp,
+            vertical = if (compact) 0.dp else 8.dp,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PlayerActionCard(
+            title = stringResource(R.string.player_action_speed),
+            value = String.format(Locale.ENGLISH, "%.2f×", state.playbackSpeed),
+            icon = Icons.Outlined.Speed,
+            tag = "speed_control",
+            compact = compact,
+            modifier = Modifier.weight(1f),
+            onClick = onShowSpeed,
+        )
+        PlayerActionCard(
+            title = stringResource(R.string.player_action_files),
+            value = stringResource(R.string.player_files_count, state.trackCount),
+            icon = Icons.Outlined.FolderOpen,
+            tag = "open_player_files_button",
+            compact = compact,
+            modifier = Modifier.weight(1f),
+            onClick = onOpenFiles,
+        )
+        PlayerActionCard(
+            title = stringResource(R.string.player_action_timer),
+            value = stringResource(R.string.cd_sleep_timer),
+            icon = Icons.Outlined.Bedtime,
+            tag = "player_timer_control",
+            compact = compact,
+            modifier = Modifier.weight(1f),
+            onClick = onShowSleepTimer,
+        )
+    }
+}
+
+@Composable
+private fun PlayerActionCard(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    tag: String,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(if (compact) 56.dp else 84.dp).testTag(tag),
+        shape = RoundedCornerShape(PLAYER_CARD_CORNER),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(
+                horizontal = if (compact) 4.dp else 8.dp,
+                vertical = if (compact) 2.dp else 10.dp,
+            ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(if (compact) 20.dp else 24.dp),
+            )
+            Text(
+                title,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+            Text(
+                value,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverArt(coverUri: String?, title: String, modifier: Modifier = Modifier) {
     if (coverUri != null) {
         AsyncImage(
             model = coverUri,
@@ -687,13 +997,11 @@ private fun CoverArt(
         )
     } else {
         Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+            modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = title.take(2).uppercase(),
+                title.take(2).uppercase(),
                 style = MaterialTheme.typography.displayLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
@@ -701,56 +1009,12 @@ private fun CoverArt(
     }
 }
 
-@Composable
-private fun SpeedControl(
-    currentSpeed: Float,
-    onSpeedChanged: (Float) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("speed_control"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = String.format(Locale.ENGLISH, "%.2f×", currentSpeed),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.testTag("speed_text"),
-        )
-        val playbackSpeedDesc = stringResource(R.string.cd_playback_speed)
-        Slider(
-            value = currentSpeed,
-            onValueChange = { raw ->
-                val snapped = (raw * PLAYBACK_SPEED_STEP_COUNT).roundToInt() / PLAYBACK_SPEED_STEP_COUNT.toFloat()
-                onSpeedChanged(snapped.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX))
-            },
-            valueRange = PLAYBACK_SPEED_MIN..PLAYBACK_SPEED_MAX,
-            steps = PLAYBACK_SPEED_SLIDER_STEPS,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("speed_slider")
-                .semantics { contentDescription = playbackSpeedDesc },
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.speed_min),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.speed_max),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
+private const val MILLIS_PER_SECOND = 1_000
+private const val SECONDS_PER_MINUTE = 60
+private const val SECONDS_PER_HOUR = 3_600
 
 private fun formatTime(ms: Long): String {
-    val totalSeconds = ms / MILLIS_PER_SECOND
+    val totalSeconds = ms.coerceAtLeast(0L) / MILLIS_PER_SECOND
     val hours = totalSeconds / SECONDS_PER_HOUR
     val minutes = (totalSeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE
     val seconds = totalSeconds % SECONDS_PER_MINUTE
@@ -761,12 +1025,7 @@ private fun formatTime(ms: Long): String {
     }
 }
 
-private const val PLAYBACK_SPEED_STEP_COUNT = 20
-private const val PLAYBACK_SPEED_MIN = 0.5f
-private const val PLAYBACK_SPEED_MAX = 2.0f
-private const val PLAYBACK_SPEED_SLIDER_STEPS = 29
-private const val MILLIS_PER_SECOND = 1000
-private const val SECONDS_PER_HOUR = 3600
-private const val SECONDS_PER_MINUTE = 60
-private const val LANDSCAPE_COVER_HEIGHT_FRACTION = 0.85f
-private const val PORTRAIT_COVER_WIDTH_FRACTION = 0.7f
+@Composable
+private fun LoadingIndicator(padding: PaddingValues) {
+    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+}

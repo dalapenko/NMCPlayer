@@ -27,14 +27,14 @@
     <string name="sort_title_ascending">По названию, от А до Я</string>
     <string name="sort_title_descending">По названию, от Я до А</string>
 
-    <string name="empty_library_title">Ваша библиотека пуста</string>
-    <string name="empty_library_subtitle">Нажмите +, чтобы добавить папку или файл с аудиокнигой</string>
-
-    <string name="dialog_delete_title">Удалить книгу</string>
-    <string name="dialog_delete_message">Удалить \"%1$s\" из библиотеки?</string>
-    <string name="dialog_delete_also_files">Также удалить файлы с устройства</string>
-    <string name="dialog_delete_irreversible">Это действие нельзя отменить</string>
-    <string name="dialog_delete_confirm">Удалить</string>
+    <string name="dialog_delete_title">Убрать из библиотеки?</string>
+    <string name="dialog_delete_files_title">Удалить исходные файлы?</string>
+    <string name="dialog_delete_message">«%1$s»</string>
+    <string name="dialog_delete_also_files">Удалить исходные файлы</string>
+    <string name="dialog_delete_stays_on_device">Файлы останутся на устройстве.</string>
+    <string name="dialog_delete_irreversible">Это действие нельзя отменить.</string>
+    <string name="dialog_delete_confirm">Убрать</string>
+    <string name="dialog_delete_files_confirm">Удалить файлы</string>
     <string name="dialog_delete_cancel">Отмена</string>
 
     <string name="section_continue_listening">Продолжить прослушивание</string>
@@ -47,7 +47,11 @@
     <string name="cd_playing">Воспроизводится</string>
     <string name="cd_paused">На паузе</string>
 
-    <string name="snackbar_track_unavailable">Трек недоступен: %1$s</string>
+    <string name="player_audio_error_title">Ошибка аудиофайла</string>
+    <string name="player_audio_error_message">Этот файл недоступен. Выберите другой файл или попробуйте снова.</string>
+    <string name="player_audio_error_close">Закрыть</string>
+    <string name="player_audio_error_retry">Повторить</string>
+    <string name="player_audio_error_choose_file">Выбрать другой файл</string>
     <string name="cd_back">Назад</string>
     <string name="cd_show_chapters">Показать главы</string>
     <string name="cd_cover_art_for">Обложка: %1$s</string>

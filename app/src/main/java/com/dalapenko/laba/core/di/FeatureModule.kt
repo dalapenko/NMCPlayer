@@ -2,6 +2,7 @@ package com.dalapenko.laba.core.di
 
 import com.dalapenko.laba.core.media.PlaybackPreparer
 import com.dalapenko.laba.feature.library.LibraryViewModel
+import com.dalapenko.laba.feature.player.PlayerFilesViewModel
 import com.dalapenko.laba.feature.player.PlayerViewModel
 import com.dalapenko.laba.feature.settings.SettingsRepository
 import com.dalapenko.laba.feature.settings.SettingsViewModel
@@ -27,6 +28,13 @@ val featureModule = module {
             playbackPreparer = get(),
             sleepTimerController = get(),
             settingsRepository = get(),
+        )
+    }
+    viewModel { params ->
+        PlayerFilesViewModel(
+            bookId = params.get(),
+            repository = get(),
+            playbackController = get(),
         )
     }
 }

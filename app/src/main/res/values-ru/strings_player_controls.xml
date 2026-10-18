@@ -1,0 +1,21 @@
+<resources>
+    <string name="control_done">Готово</string>
+    <string name="control_close">Закрыть</string>
+    <string name="control_speed_title">Скорость воспроизведения</string>
+    <string name="control_speed_value">%1$s×</string>
+    <string name="control_speed_preset">%1$s×</string>
+    <string name="control_speed_step">±0,05×</string>
+    <string name="control_speed_fine_tune">Точная настройка · 0,5×–2×</string>
+    <string name="control_speed_increase">Увеличить скорость</string>
+    <string name="control_speed_decrease">Уменьшить скорость</string>
+    <string name="control_sleep_timer_title">Таймер сна</string>
+    <string name="control_sleep_timer_after_time">Через время</string>
+    <string name="control_sleep_timer_end_of_file">В конце файла</string>
+    <string name="control_sleep_timer_end_of_file_description">Воспроизведение остановится в конце файла (осталось %1$s).</string>
+    <string name="control_sleep_timer_time_description">Воспроизведение остановится через %1$d мин.</string>
+    <string name="control_sleep_timer_active_description">Воспроизведение остановится через</string>
+    <string name="control_sleep_timer_minutes">%1$d мин</string>
+    <string name="control_sleep_timer_minutes_label">минут</string>
+    <string name="control_sleep_timer_start">Включить таймер</string>
+    <string name="control_sleep_timer_cancel">Отменить таймер</string>
+</resources>

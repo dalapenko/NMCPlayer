@@ -1,0 +1,16 @@
+<resources>
+    <string name="player_action_speed">Speed</string>
+    <string name="player_action_files">Files</string>
+    <string name="player_files_title">Files</string>
+    <string name="player_files_empty">No tracks are available.</string>
+    <string name="player_now_listening">Now listening</string>
+    <string name="player_more_options">More options</string>
+    <string name="player_action_timer">Timer</string>
+    <string name="player_files_count">Files · %1$d</string>
+    <string name="player_file_current_name">%1$s · Current</string>
+    <string name="player_file_position">%1$d of %2$d</string>
+    <string name="player_listened_percent">%1$d%% listened</string>
+    <string name="player_time_remaining">%1$s remaining</string>
+    <string name="cd_close">Close</string>
+    <string name="player_close">Close player</string>
+</resources>

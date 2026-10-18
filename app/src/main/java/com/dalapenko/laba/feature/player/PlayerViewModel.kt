@@ -164,6 +164,12 @@ class PlayerViewModel(
         playbackController.seekToTrack(index)
     }
 
+    fun retryTrack(index: Int) {
+        if (index !in _uiState.value.tracks.indices) return
+        playbackController.seekToTrack(index, 0L)
+        playbackController.play()
+    }
+
     fun setSpeed(speed: Float) {
         playbackController.setSpeed(speed.coerceIn(PLAYBACK_SPEED_MIN, PLAYBACK_SPEED_MAX))
     }
@@ -277,8 +283,8 @@ class PlayerViewModel(
 }
 
 private const val COMPLETION_THRESHOLD_MS = 1000L
-private const val PLAYBACK_SPEED_MIN = 0.5f
-private const val PLAYBACK_SPEED_MAX = 2.0f
+internal const val PLAYBACK_SPEED_MIN = 0.5f
+internal const val PLAYBACK_SPEED_MAX = 2.0f
 private const val DEFAULT_SLEEP_TIMER_MINUTES = 30
 private const val MILLIS_PER_MINUTE = 60_000L
 

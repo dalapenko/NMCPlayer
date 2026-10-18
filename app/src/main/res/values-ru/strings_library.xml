@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_search_label">Поиск книг</string>
+    <string name="library_search_clear">Очистить поиск</string>
+    <string name="library_filter_selected">Выбрано</string>
+    <string name="library_filter_all">Все</string>
+    <string name="library_filter_in_progress">В процессе</string>
+    <string name="library_filter_not_started">Не начато</string>
+    <string name="library_filter_completed">Прослушано</string>
+    <string name="library_search_no_match_title">Книги не найдены</string>
+    <string name="library_search_no_match_message">Попробуйте изменить название или автора.</string>
+    <string name="library_filter_no_books_title">В этом разделе нет книг</string>
+    <string name="library_filter_no_books_message">Выберите другой статус, чтобы увидеть книги.</string>
+    <string name="library_clear_search_and_filter">Сбросить поиск и фильтр</string>
+    <string name="library_search_placeholder">Название или автор</string>
+    <string name="library_filter_sheet_title">Показывать</string>
+    <string name="cd_filter_library">Фильтр библиотеки</string>
+    <string name="cd_resume_playback">Воспроизвести</string>
+    <string name="cd_pause_playback">Приостановить</string>
+    <string name="library_empty_title">Ваша библиотека пуста</string>
+    <string name="library_empty_message">Добавьте папку или файл с аудиокнигой.</string>
+    <string name="library_scan_in_progress">Сканирование аудиокниг</string>
+    <string name="library_import_scanning_title">Добавление аудио</string>
+    <string name="library_import_scanning_message">Поиск аудиокниг…</string>
+    <string name="library_import_added_title">Добавлено</string>
+    <string name="library_import_duplicate_title">Уже в библиотеке</string>
+    <string name="library_import_no_audio_title">Аудио не найдено</string>
+    <string name="library_import_permission_title">Нет доступа</string>
+    <string name="library_import_choose_folder">Выбрать папку повторно</string>
+    <string name="library_source_unavailable_title">Источник недоступен</string>
+    <string name="library_source_unavailable_message">Не удаётся открыть источник книги. Проверьте наличие исходных файлов и доступа к ним.</string>
+    <string name="library_modal_close">Закрыть</string>
+    <string name="library_add_audio_title">Добавить аудио</string>
+    <string name="library_add_folder_note">Одна папка создаёт одну запись. Вложенные папки сканируются отдельно.</string>
+    <string name="library_add_files_note">Файлы останутся на устройстве.</string>
+    <string name="library_import_scanning_folder">Сканирование: %1$s</string>
+    <string name="library_import_duplicate_message">«%1$s» уже есть в библиотеке.</string>
+    <string name="library_source_check_again">Проверить снова</string>
+    <string name="library_empty_add_audio">Добавить аудио</string>
+    <plurals name="library_import_record_count">
+        <item quantity="one">Добавлена %1$d запись</item>
+        <item quantity="few">Добавлено %1$d записи</item>
+        <item quantity="many">Добавлено %1$d записей</item>
+        <item quantity="other">Добавлено %1$d записи</item>
+    </plurals>
+    <plurals name="library_import_audio_file_count">
+        <item quantity="one">%1$d аудиофайл</item>
+        <item quantity="few">%1$d аудиофайла</item>
+        <item quantity="many">%1$d аудиофайлов</item>
+        <item quantity="other">%1$d аудиофайла</item>
+    </plurals>
+    <string name="library_import_open">Открыть</string>
+    <string name="library_import_open_library">Открыть библиотеку</string>
+    <string name="library_import_choose_source">Выбрать источник</string>
+    <string name="library_title">Библиотека</string>
+    <plurals name="library_book_count">
+        <item quantity="one">%1$d книга в библиотеке</item>
+        <item quantity="few">%1$d книги в библиотеке</item>
+        <item quantity="many">%1$d книг в библиотеке</item>
+        <item quantity="other">%1$d книги в библиотеке</item>
+    </plurals>
+    <plurals name="library_result_count">
+        <item quantity="one">Всего · %1$d</item>
+        <item quantity="few">Всего · %1$d</item>
+        <item quantity="many">Всего · %1$d</item>
+        <item quantity="other">Всего · %1$d</item>
+    </plurals>
+</resources>

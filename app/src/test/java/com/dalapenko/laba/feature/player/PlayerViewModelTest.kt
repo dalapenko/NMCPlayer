@@ -572,4 +572,29 @@ class PlayerViewModelTest {
             cancelAndConsumeRemainingEvents()
         }
     }
+
+    @Test
+    fun givenUnavailableTrack_whenRetryTrack_thenSameTrackIsSelectedAndPlaybackResumes() = runTest {
+        val book = testBook(id = bookId)
+        val tracks = listOf(testTrack(id = 10L, bookId = bookId))
+        coEvery { mockRepository.getBookWithTracks(bookId) } returns (book to tracks)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.retryTrack(0)
+
+        verify { mockController.seekToTrack(0, 0L) }
+        verify { mockController.play() }
+    }
+
+    @Test
+    fun givenInvalidTrackIndex_whenRetryTrack_thenPlaybackIsUnchanged() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.retryTrack(0)
+
+        verify(exactly = 0) { mockController.seekToTrack(any(), any()) }
+        verify(exactly = 0) { mockController.play() }
+    }
 }

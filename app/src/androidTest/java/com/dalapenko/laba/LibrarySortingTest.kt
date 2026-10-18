@@ -54,7 +54,7 @@ class LibrarySortingTest : BaseKaspressoTest() {
     }
 
     @Test
-    fun selectingSortOption_persistsAcrossScreenRecreation_andKeepsContinueSeparate() = run {
+    fun selectingSortOption_persistsAcrossScreenRecreation_andKeepsContinueInFullList() = run {
         waitForLibrary()
 
         withScreen<LibraryScreen> {
@@ -66,6 +66,7 @@ class LibrarySortingTest : BaseKaspressoTest() {
 
         withScreen<LibraryScreen> {
             continueBookCard(continueBook.id).assertIsDisplayed()
+            bookCard(continueBook.id).assertIsDisplayed()
             bookCard(ordinaryBook.id).assertIsDisplayed()
         }
 

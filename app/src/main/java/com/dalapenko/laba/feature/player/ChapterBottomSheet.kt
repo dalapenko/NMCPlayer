@@ -26,9 +26,10 @@ import com.dalapenko.laba.core.database.entity.TrackEntity
 import java.util.Locale
 
 private const val CURRENT_TRACK_HIGHLIGHT_ALPHA = 0.3f
-private const val MILLIS_PER_SECOND = 1000
+private const val MILLIS_PER_SECOND = 1_000
 private const val SECONDS_PER_MINUTE = 60
 
+@Suppress("LongMethod") // The chapter list remains a single stateful Compose sheet.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChapterBottomSheet(
@@ -42,6 +43,8 @@ fun ChapterBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.testTag("chapter_bottom_sheet"),
     ) {
         Text(
@@ -57,7 +60,11 @@ fun ChapterBottomSheet(
                 .fillMaxWidth()
                 .testTag("chapters_list"),
         ) {
-            itemsIndexed(tracks) { index, track ->
+            itemsIndexed(
+                tracks,
+                key = { _, track -> track.id },
+                contentType = { _, _ -> "track" },
+            ) { index, track ->
                 val isCurrent = index == currentTrackIndex
                 ListItem(
                     headlineContent = {
@@ -98,7 +105,7 @@ fun ChapterBottomSheet(
     }
 }
 
-private fun formatDuration(ms: Long): String {
+internal fun formatDuration(ms: Long): String {
     val totalSeconds = ms / MILLIS_PER_SECOND
     val minutes = totalSeconds / SECONDS_PER_MINUTE
     val seconds = totalSeconds % SECONDS_PER_MINUTE

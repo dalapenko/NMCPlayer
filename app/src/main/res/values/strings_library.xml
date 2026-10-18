@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_search_label">Search books</string>
+    <string name="library_search_clear">Clear search</string>
+    <string name="library_filter_selected">Selected</string>
+    <string name="library_filter_all">All</string>
+    <string name="library_filter_in_progress">In progress</string>
+    <string name="library_filter_not_started">Not started</string>
+    <string name="library_filter_completed">Completed</string>
+    <string name="library_search_no_match_title">No matching books</string>
+    <string name="library_search_no_match_message">Try another title or author.</string>
+    <string name="library_filter_no_books_title">No books in this section</string>
+    <string name="library_filter_no_books_message">Choose another status to see more books.</string>
+    <string name="library_clear_search_and_filter">Clear search and filter</string>
+    <string name="library_search_placeholder">Title or author</string>
+    <string name="library_filter_sheet_title">Show</string>
+    <string name="cd_filter_library">Filter library</string>
+    <string name="cd_resume_playback">Play</string>
+    <string name="cd_pause_playback">Pause</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_message">Add an audiobook folder or file to start listening.</string>
+    <string name="library_scan_in_progress">Scanning audiobooks</string>
+    <string name="library_import_scanning_title">Adding audio</string>
+    <string name="library_import_scanning_message">Scanning for audiobooks…</string>
+    <string name="library_import_added_title">Added</string>
+    <string name="library_import_duplicate_title">Already in library</string>
+    <string name="library_import_no_audio_title">No audio found</string>
+    <string name="library_import_permission_title">Access not granted</string>
+    <string name="library_import_choose_folder">Choose folder again</string>
+    <string name="library_source_unavailable_title">Source unavailable</string>
+    <string name="library_source_unavailable_message">This book’s source cannot be opened. Check that the original files and access are available.</string>
+    <string name="library_modal_close">Close</string>
+    <string name="library_add_audio_title">Add audio</string>
+    <string name="library_add_folder_note">A folder creates one record. Nested folders are scanned separately.</string>
+    <string name="library_add_files_note">Files stay on your device.</string>
+    <string name="library_import_scanning_folder">Scanning %1$s</string>
+    <string name="library_import_duplicate_message">“%1$s” is already in your library.</string>
+    <string name="library_source_check_again">Check again</string>
+    <string name="library_empty_add_audio">Add audio</string>
+    <plurals name="library_import_record_count">
+        <item quantity="one">%1$d record added</item>
+        <item quantity="other">%1$d records added</item>
+    </plurals>
+    <plurals name="library_import_audio_file_count">
+        <item quantity="one">%1$d audio file</item>
+        <item quantity="other">%1$d audio files</item>
+    </plurals>
+    <string name="library_import_open">Open</string>
+    <string name="library_import_open_library">Open library</string>
+    <string name="library_import_choose_source">Choose source</string>
+    <string name="library_title">Library</string>
+    <plurals name="library_book_count">
+        <item quantity="one">%1$d book in library</item>
+        <item quantity="other">%1$d books in library</item>
+    </plurals>
+    <plurals name="library_result_count">
+        <item quantity="one">Total · %1$d</item>
+        <item quantity="other">Total · %1$d</item>
+    </plurals>
+</resources>

@@ -2,6 +2,8 @@ package com.dalapenko.laba.feature.settings
 
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,11 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
@@ -30,6 +35,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -38,10 +44,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,15 +69,13 @@ fun SettingsScreen(
 ) {
     val viewModel: SettingsViewModel = koinViewModel()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-
     val appLocales = AppCompatDelegate.getApplicationLocales()
     val languageLabel = when {
         appLocales.isEmpty -> stringResource(R.string.settings_language_system)
         appLocales.toLanguageTags().startsWith("ru") -> stringResource(R.string.settings_language_ru)
         else -> stringResource(R.string.settings_language_en)
     }
-
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val uriHandler = LocalUriHandler.current
     val showLicenseDialog = remember { mutableStateOf(false) }
     val showThemeDialog = remember { mutableStateOf(false) }
@@ -81,6 +88,7 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
@@ -92,26 +100,62 @@ fun SettingsScreen(
                         )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .padding(padding),
         ) {
-            SettingsGeneralSection(
-                themeLabel = themeLabel,
-                languageLabel = languageLabel,
-                onThemeClick = { showThemeDialog.value = true },
-                onLanguageClick = { showLanguageDialog.value = true },
-            )
-            SettingsAboutSection(
-                uriHandler = uriHandler,
-                onLicenseClick = { showLicenseDialog.value = true },
-            )
+            val wideLayout = maxWidth >= 800.dp
+            val contentModifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 800.dp)
+                .align(Alignment.TopCenter)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+
+            if (wideLayout) {
+                Row(
+                    modifier = contentModifier,
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    SettingsGeneralSection(
+                        modifier = Modifier.weight(1f),
+                        themeLabel = themeLabel,
+                        languageLabel = languageLabel,
+                        onThemeClick = { showThemeDialog.value = true },
+                        onLanguageClick = { showLanguageDialog.value = true },
+                    )
+                    SettingsAboutSection(
+                        modifier = Modifier.weight(1f),
+                        uriHandler = uriHandler,
+                        onLicenseClick = { showLicenseDialog.value = true },
+                    )
+                }
+            } else {
+                Column(
+                    modifier = contentModifier,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    SettingsGeneralSection(
+                        themeLabel = themeLabel,
+                        languageLabel = languageLabel,
+                        onThemeClick = { showThemeDialog.value = true },
+                        onLanguageClick = { showLanguageDialog.value = true },
+                    )
+                    SettingsAboutSection(
+                        uriHandler = uriHandler,
+                        onLicenseClick = { showLicenseDialog.value = true },
+                    )
+                }
+            }
         }
     }
 
@@ -142,74 +186,131 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsGeneralSection(
+    modifier: Modifier = Modifier,
     themeLabel: String,
     languageLabel: String,
     onThemeClick: () -> Unit,
     onLanguageClick: () -> Unit,
 ) {
-    SectionHeader(title = stringResource(R.string.settings_section_general))
-
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_appearance)) },
-        supportingContent = { Text(themeLabel) },
-        leadingContent = {
-            SettingsItemIcon(Icons.Outlined.Palette)
-        },
-        modifier = Modifier.clickable(onClick = onThemeClick),
-    )
-
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_language)) },
-        supportingContent = { Text(languageLabel) },
-        leadingContent = {
-            SettingsItemIcon(Icons.Outlined.Language)
-        },
-        modifier = Modifier.clickable(onClick = onLanguageClick),
-    )
-
-    Spacer(Modifier.height(8.dp))
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-    Spacer(Modifier.height(8.dp))
+    Column(modifier = modifier) {
+        SectionHeader(title = stringResource(R.string.settings_section_general))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column {
+                SettingsChoiceItem(
+                    title = stringResource(R.string.settings_appearance),
+                    subtitle = themeLabel,
+                    icon = Icons.Outlined.Palette,
+                    onClick = onThemeClick,
+                )
+                SettingsDivider()
+                SettingsChoiceItem(
+                    title = stringResource(R.string.settings_language),
+                    subtitle = languageLabel,
+                    icon = Icons.Outlined.Language,
+                    onClick = onLanguageClick,
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun SettingsAboutSection(
+    modifier: Modifier = Modifier,
     uriHandler: androidx.compose.ui.platform.UriHandler,
     onLicenseClick: () -> Unit,
 ) {
-    SectionHeader(title = stringResource(R.string.settings_section_about))
+    Column(modifier = modifier) {
+        SectionHeader(title = stringResource(R.string.settings_section_about))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column {
+                SettingsInfoItem(
+                    title = stringResource(R.string.settings_version),
+                    subtitle = settingsVersionText(),
+                    icon = Icons.Outlined.Info,
+                )
+                SettingsDivider()
+                SettingsInfoItem(
+                    title = stringResource(R.string.settings_author),
+                    subtitle = stringResource(R.string.settings_author_value),
+                    icon = Icons.Outlined.Person,
+                )
+                SettingsDivider()
+                ExternalLinkItem(
+                    title = stringResource(R.string.settings_github),
+                    url = GITHUB_URL,
+                    icon = { SettingsItemIcon(Icons.Outlined.Code) },
+                    uriHandler = uriHandler,
+                )
+                SettingsDivider()
+                ExternalLinkItem(
+                    title = stringResource(R.string.settings_privacy_policy),
+                    url = PRIVACY_POLICY_URL,
+                    icon = { SettingsItemIcon(Icons.Outlined.Policy) },
+                    uriHandler = uriHandler,
+                )
+                SettingsDivider()
+                SettingsChoiceItem(
+                    title = stringResource(R.string.settings_licenses),
+                    subtitle = stringResource(R.string.settings_licenses_description),
+                    icon = Icons.Outlined.Description,
+                    onClick = onLicenseClick,
+                )
+            }
+        }
+    }
+}
 
+@Composable
+private fun SettingsChoiceItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_version)) },
-        supportingContent = { Text(settingsVersionText()) },
-        leadingContent = { SettingsItemIcon(Icons.Outlined.Info) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        leadingContent = { SettingsItemIcon(icon) },
+        trailingContent = {
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
     )
+}
 
+@Composable
+private fun SettingsInfoItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_author)) },
-        supportingContent = { Text(stringResource(R.string.settings_author_value)) },
-        leadingContent = { SettingsItemIcon(Icons.Outlined.Person) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
+        leadingContent = { SettingsItemIcon(icon) },
     )
+}
 
-    ExternalLinkItem(
-        title = stringResource(R.string.settings_github),
-        url = GITHUB_URL,
-        icon = { SettingsItemIcon(Icons.Outlined.Code) },
-        uriHandler = uriHandler,
-    )
-
-    ExternalLinkItem(
-        title = stringResource(R.string.settings_privacy_policy),
-        url = PRIVACY_POLICY_URL,
-        icon = { SettingsItemIcon(Icons.Outlined.Policy) },
-        uriHandler = uriHandler,
-    )
-
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_licenses)) },
-        supportingContent = { Text(stringResource(R.string.settings_licenses_description)) },
-        leadingContent = { SettingsItemIcon(Icons.Outlined.Description) },
-        modifier = Modifier.clickable(onClick = onLicenseClick),
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 68.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outline,
     )
 }
 
@@ -231,12 +332,7 @@ private fun ExternalLinkItem(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = {
-            Text(
-                text = url,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        },
+        supportingContent = { Text(url, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         leadingContent = icon,
         trailingContent = {
             Icon(
@@ -245,7 +341,9 @@ private fun ExternalLinkItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
-        modifier = Modifier.clickable { uriHandler.openUri(url) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { uriHandler.openUri(url) },
     )
 }
 
@@ -305,7 +403,7 @@ private fun ThemeDialog(
 }
 
 @Composable
-private fun LanguageDialog(
+internal fun LanguageDialog(
     currentTag: String?,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
@@ -316,6 +414,7 @@ private fun LanguageDialog(
         "en" to stringResource(R.string.settings_language_en),
         "ru" to stringResource(R.string.settings_language_ru),
     )
+    var selectedTag by rememberSaveable(currentTag) { mutableStateOf(currentTag) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_language)) },
@@ -323,24 +422,19 @@ private fun LanguageDialog(
             Column {
                 options.forEach { (tag, label) ->
                     val selected = when {
-                        tag == null -> currentTag == null
-                        else -> currentTag?.startsWith(tag) == true
+                        tag == null -> selectedTag == null
+                        else -> selectedTag?.startsWith(tag) == true
                     }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                onSelect(tag)
-                                onDismiss()
-                            },
+                            .testTag("settings_language_option_${tag ?: "system"}")
+                            .clickable { selectedTag = tag },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = selected,
-                            onClick = {
-                                onSelect(tag)
-                                onDismiss()
-                            },
+                            onClick = { selectedTag = tag },
                         )
                         Text(label)
                     }
@@ -348,7 +442,21 @@ private fun LanguageDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = {
+                    onSelect(selectedTag)
+                    onDismiss()
+                },
+                modifier = Modifier.testTag("settings_language_done_button"),
+            ) {
+                Text(stringResource(R.string.settings_language_done))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("settings_language_close_button"),
+            ) {
                 Text(stringResource(R.string.settings_licenses_close))
             }
         },
@@ -363,8 +471,8 @@ private fun SectionHeader(
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 12.dp),
     )
 }
 

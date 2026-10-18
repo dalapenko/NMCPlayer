@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -88,11 +90,14 @@ class LibraryViewModel(
     // Single shared subscription to avoid two parallel Room queries for the same data.
     private val allBooksFlow = repository.observeAllBooksWithProgress()
         .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
+    private val libraryPlayerState = playbackController.playerState
+        .map { state -> state.copy(currentPositionMs = state.currentPositionMs / 1_000L * 1_000L) }
+        .distinctUntilChanged()
 
     val books: StateFlow<List<BookWithProgress>> = combine(
         allBooksFlow,
         playbackController.currentBookId,
-        playbackController.playerState,
+        libraryPlayerState,
         _currentBookTracks,
     ) { dbBooks, activeBookId, playerState, tracksForBook ->
         if (activeBookId == null) return@combine dbBooks
@@ -119,7 +124,7 @@ class LibraryViewModel(
     val continueBook: StateFlow<ContinueBookUiState?> = combine(
         books,
         playbackController.currentBookId,
-        playbackController.playerState,
+        libraryPlayerState,
         lastPlayedBookId,
     ) { bookItems, activeBookId, playerState, fallbackBookId ->
         val activeBook = activeBookId?.let { currentId ->
@@ -156,14 +161,10 @@ class LibraryViewModel(
 
     val libraryBooks: StateFlow<List<BookWithProgress>> = combine(
         books,
-        continueBook,
         sortOption,
-    ) { bookItems, continueItem, selectedSortOption ->
-        val sortedBooks = sortLibraryBooks(bookItems, selectedSortOption)
-        val continueBookId = continueItem?.book?.book?.id
-        if (continueBookId == null) sortedBooks else sortedBooks.filterNot { it.book.id == continueBookId }
+    ) { bookItems, selectedSortOption ->
+        sortLibraryBooks(bookItems, selectedSortOption)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
@@ -172,6 +173,8 @@ class LibraryViewModel(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private val _scanResult = MutableStateFlow<ScanResult?>(null)
+    private val _scanningSourceName = MutableStateFlow<String?>(null)
+    val scanningSourceName: StateFlow<String?> = _scanningSourceName.asStateFlow()
     val scanResult: StateFlow<ScanResult?> = _scanResult.asStateFlow()
 
     init {
@@ -214,12 +217,12 @@ class LibraryViewModel(
         viewModelScope.launch {
             val bookCheck = repository.getBookById(bookId)
             if (bookCheck != null && !bookCheck.isAvailable) {
-                _events.tryEmit(LibraryEvent.FileNotAvailable)
+                _events.tryEmit(LibraryEvent.FileNotAvailable(bookId))
                 return@launch
             }
             if (bookCheck != null && !scanner.isBookAvailable(bookCheck.rootFolderUri)) {
                 repository.setBookAvailability(bookId, false)
-                _events.tryEmit(LibraryEvent.FileNotAvailable)
+                _events.tryEmit(LibraryEvent.FileNotAvailable(bookId))
                 return@launch
             }
 
@@ -246,8 +249,10 @@ class LibraryViewModel(
         }
     }
 
-    fun onFolderPicked(uri: Uri, contentResolver: ContentResolver) {
+    fun onFolderPicked(uri: Uri, contentResolver: ContentResolver, sourceName: String? = null) {
         viewModelScope.launch {
+            _scanResult.value = null
+            _scanningSourceName.value = sourceName
             _isScanning.value = true
             try {
                 contentResolver.acquireUriPermission(uri)
@@ -256,28 +261,40 @@ class LibraryViewModel(
                     _scanResult.value = ScanResult.Empty
                 } else {
                     var addedCount = 0
-                    val firstTitle = scannedBooks.first().title
+                    var addedAudioFileCount = 0
+                    var firstAddedTitle: String? = null
                     for (scanned in scannedBooks) {
                         val book = scanner.toBookEntity(scanned)
                         val tracks = scanner.toTrackEntities(scanned)
                         val id = repository.addBookIfNew(book, tracks)
-                        if (id != null) addedCount++
+                        if (id != null) {
+                            addedCount++
+                            addedAudioFileCount += tracks.size
+                            if (firstAddedTitle == null) firstAddedTitle = book.title
+                        }
                     }
                     _scanResult.value = when {
-                        addedCount == 0 -> ScanResult.Duplicate
-                        else -> ScanResult.Success(firstTitle, addedCount)
+                        addedCount == 0 -> ScanResult.Duplicate(sourceName ?: scannedBooks.first().title)
+                        else -> ScanResult.Success(
+                            title = firstAddedTitle ?: scannedBooks.first().title,
+                            recordCount = addedCount,
+                            audioFileCount = addedAudioFileCount,
+                        )
                     }
                 }
             } catch (_: SecurityException) {
                 _scanResult.value = ScanResult.PermissionError
             } finally {
                 _isScanning.value = false
+                _scanningSourceName.value = null
             }
         }
     }
 
-    fun onFilePicked(uri: Uri, contentResolver: ContentResolver) {
+    fun onFilePicked(uri: Uri, contentResolver: ContentResolver, sourceName: String? = null) {
         viewModelScope.launch {
+            _scanResult.value = null
+            _scanningSourceName.value = sourceName
             _isScanning.value = true
             try {
                 contentResolver.acquireUriPermission(uri)
@@ -288,12 +305,17 @@ class LibraryViewModel(
                     val book = scanner.toBookEntity(scanned)
                     val tracks = scanner.toTrackEntities(scanned)
                     val id = repository.addBookIfNew(book, tracks)
-                    _scanResult.value = if (id != null) ScanResult.Success(scanned.title) else ScanResult.Duplicate
+                    _scanResult.value = if (id != null) {
+                        ScanResult.Success(scanned.title, audioFileCount = tracks.size)
+                    } else {
+                        ScanResult.Duplicate(sourceName ?: scanned.title)
+                    }
                 }
             } catch (_: SecurityException) {
                 _scanResult.value = ScanResult.PermissionError
             } finally {
                 _isScanning.value = false
+                _scanningSourceName.value = null
             }
         }
     }
@@ -350,8 +372,15 @@ class LibraryViewModel(
         }
     }
 
-    fun onUnavailableBookClicked() {
-        _events.tryEmit(LibraryEvent.FileNotAvailable)
+    fun onUnavailableBookClicked(bookId: Long) {
+        _events.tryEmit(LibraryEvent.FileNotAvailable(bookId))
+    }
+
+    fun recheckBookAvailability(bookId: Long) {
+        viewModelScope.launch {
+            val book = repository.getBookById(bookId) ?: return@launch
+            repository.setBookAvailability(bookId, scanner.isBookAvailable(book.rootFolderUri))
+        }
     }
 
     fun clearScanResult() {
@@ -360,14 +389,14 @@ class LibraryViewModel(
 }
 
 sealed interface LibraryEvent {
-    data object FileNotAvailable : LibraryEvent
+    data class FileNotAvailable(val bookId: Long) : LibraryEvent
     data object FilesDeletedSuccessfully : LibraryEvent
     data object FilesDeleteFailed : LibraryEvent
 }
 
 sealed interface ScanResult {
-    data class Success(val title: String, val count: Int = 1) : ScanResult
+    data class Success(val title: String, val recordCount: Int = 1, val audioFileCount: Int = 0) : ScanResult
     data object Empty : ScanResult
-    data object Duplicate : ScanResult
+    data class Duplicate(val sourceName: String) : ScanResult
     data object PermissionError : ScanResult
 }

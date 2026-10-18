@@ -3,6 +3,7 @@ package com.dalapenko.laba.feature.player
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -24,15 +25,16 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import java.util.Locale
+import com.dalapenko.laba.R
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-private val DIAL_DIAMETER = 220.dp
-private val LABEL_AREA = 32.dp
+private val DIAL_DIAMETER = 140.dp
+private val LABEL_AREA = 16.dp
 private val TOTAL_DIAMETER = DIAL_DIAMETER + LABEL_AREA * 2
 private val RING_STROKE_WIDTH = 6.dp
 private val RING_SPACING = 22.dp
@@ -92,11 +94,18 @@ fun SleepTimerDial(
             drawSleepTimerDial(minutes = currentMinutes, trackColor = trackColor, activeColor = activeColor)
         }
 
-        Text(
-            text = String.format(Locale.ENGLISH, "%d:00", minutes),
-            style = MaterialTheme.typography.displaySmall,
-            modifier = Modifier.testTag("sleep_timer_dial_value"),
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = minutes.toString(),
+                style = MaterialTheme.typography.displaySmall,
+                modifier = Modifier.testTag("sleep_timer_dial_value"),
+            )
+            Text(
+                text = stringResource(R.string.control_sleep_timer_minutes_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -108,7 +117,7 @@ private fun DrawScope.drawSleepTimerDial(minutes: Int, trackColor: Color, active
     val stroke = Stroke(width = RING_STROKE_WIDTH.toPx(), cap = StrokeCap.Round)
     val center = Offset(size.width / 2f, size.height / 2f)
 
-    fun radiusForLap(lap: Int) = maxRadius - (MAX_LAP_INDEX - lap) * spacingPx
+    fun radiusForLap(lap: Int) = maxRadius - (ringCount - 1 - lap) * spacingPx
 
     for (lap in 0 until ringCount) {
         drawCircle(color = trackColor, radius = radiusForLap(lap), center = center, style = stroke)
@@ -160,8 +169,7 @@ private fun SleepTimerDialLabels(radius: Dp, modifier: Modifier = Modifier) {
     }
 }
 
-private const val LABEL_STEP_MINUTES = 5
+private const val LABEL_STEP_MINUTES = 15
 private const val LABELS_PER_LAP = MINUTES_PER_LAP / LABEL_STEP_MINUTES
-private const val MAX_LAP_INDEX = 2 // SLEEP_TIMER_MAX_MINUTES / MINUTES_PER_LAP - 1
 private const val ARC_START_ANGLE = -90f
 private const val FULL_CIRCLE_DEGREES = 360f

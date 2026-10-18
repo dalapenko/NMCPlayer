@@ -115,6 +115,26 @@ class SleepTimerControllerTest {
     }
 
     @Test
+    fun givenEndOfChapterAtDoubleSpeed_whenStartedAndPositionAdvances_thenWallClockRemainingIsAdjusted() = runTest {
+        playerStateFlow.value = PlayerState(
+            durationMs = 10_000L,
+            currentPositionMs = 2_000L,
+            currentMediaItemIndex = 0,
+            playbackSpeed = 2f,
+        )
+        val controller = SleepTimerController(mockPlaybackController, this)
+        controller.startEndOfChapter()
+        assertEquals(4_000L, controller.state.value.remainingMs)
+
+        playerStateFlow.value = playerStateFlow.value.copy(currentPositionMs = 3_000L)
+        advanceTimeBy(1_000L.milliseconds)
+        runCurrent()
+        assertEquals(3_500L, controller.state.value.remainingMs)
+
+        controller.cancel()
+    }
+
+    @Test
     fun givenEndOfChapter_whenPositionAdvancesWithinSameTrack_thenRemainingSelfCorrectsAndStaysActive() = runTest {
         playerStateFlow.value = PlayerState(durationMs = 10_000L, currentPositionMs = 2_000L, currentMediaItemIndex = 0)
         val controller = SleepTimerController(mockPlaybackController, this)

@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name" translatable="false">LABA</string>
+    <string name="app_name" translatable="false">NMCPlayer</string>
+    <string name="app_brand" translatable="false">NMC Player</string>
 
     <!-- Library Screen — snackbars (via context.getString in LaunchedEffect) -->
     <string name="snackbar_file_not_available">File not available</string>
@@ -28,16 +29,15 @@
     <string name="sort_title_ascending">Title, A to Z</string>
     <string name="sort_title_descending">Title, Z to A</string>
 
-    <!-- Library Screen — empty state -->
-    <string name="empty_library_title">Your library is empty</string>
-    <string name="empty_library_subtitle">Tap + to add an audiobook folder or file</string>
-
     <!-- Library Screen — delete dialog -->
-    <string name="dialog_delete_title">Delete Book</string>
-    <string name="dialog_delete_message">Remove \"%1$s\" from your library?</string>
-    <string name="dialog_delete_also_files">Also delete files from device</string>
-    <string name="dialog_delete_irreversible">This action cannot be undone</string>
-    <string name="dialog_delete_confirm">Delete</string>
+    <string name="dialog_delete_title">Remove from library?</string>
+    <string name="dialog_delete_files_title">Delete source files?</string>
+    <string name="dialog_delete_message">“%1$s”</string>
+    <string name="dialog_delete_also_files">Delete source files</string>
+    <string name="dialog_delete_stays_on_device">Files stay on your device.</string>
+    <string name="dialog_delete_irreversible">This cannot be undone.</string>
+    <string name="dialog_delete_confirm">Remove</string>
+    <string name="dialog_delete_files_confirm">Delete files</string>
     <string name="dialog_delete_cancel">Cancel</string>
 
     <!-- Library Screen — book card -->
@@ -51,8 +51,12 @@
     <string name="cd_playing">Playing</string>
     <string name="cd_paused">Paused</string>
 
-    <!-- Player Screen — snackbar -->
-    <string name="snackbar_track_unavailable">Track unavailable: %1$s</string>
+    <!-- Player Screen — error sheet -->
+    <string name="player_audio_error_title">Audio file error</string>
+    <string name="player_audio_error_message">This file is unavailable. Choose another file or try again.</string>
+    <string name="player_audio_error_close">Close</string>
+    <string name="player_audio_error_retry">Retry</string>
+    <string name="player_audio_error_choose_file">Choose another file</string>
 
     <!-- Player Screen — navigation -->
     <string name="cd_back">Back</string>
@@ -118,7 +122,7 @@
     <string name="settings_privacy_policy">Privacy Policy</string>
     <string name="settings_licenses">Open Source Licenses</string>
     <string name="settings_licenses_description">Third-party libraries used in this app</string>
-    <string name="settings_app_license_section" translatable="false">LABA — MIT License</string>
+    <string name="settings_app_license_section" translatable="false">NMCPlayer — MIT License</string>
     <string name="settings_app_license_text" translatable="false">Copyright (c) 2025 dalapenko\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</string>
     <string name="settings_third_party_section">Third-party Libraries</string>
     <string name="settings_licenses_text">- Jetpack Compose (Apache 2.0)\n- Koin (Apache 2.0)\n- Media3 / ExoPlayer (Apache 2.0)\n- Room (Apache 2.0)\n- Coil (Apache 2.0)\n- Kotlin &amp; Kotlinx (Apache 2.0)\n\nhttps://www.apache.org/licenses/LICENSE-2.0</string>

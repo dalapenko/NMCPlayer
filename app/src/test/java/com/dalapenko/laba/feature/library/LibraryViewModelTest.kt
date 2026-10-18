@@ -105,7 +105,7 @@ class LibraryViewModelTest {
         vm.events.test {
             vm.prepareAndPlay(1L)
             advanceUntilIdle()
-            assertEquals(LibraryEvent.FileNotAvailable, awaitItem())
+            assertEquals(LibraryEvent.FileNotAvailable(1L), awaitItem())
             cancelAndConsumeRemainingEvents()
         }
     }
@@ -123,7 +123,7 @@ class LibraryViewModelTest {
             vm.prepareAndPlay(1L)
             advanceUntilIdle()
             coVerify { mockRepository.setBookAvailability(1L, false) }
-            assertEquals(LibraryEvent.FileNotAvailable, awaitItem())
+            assertEquals(LibraryEvent.FileNotAvailable(1L), awaitItem())
             cancelAndConsumeRemainingEvents()
         }
     }
@@ -399,6 +399,54 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun givenPositionChangesWithinOneSecond_whenObservingLibraryBooks_thenOnlyWholeSecondProgressEmits() = runTest {
+        val book = testBook(id = 1L, totalDurationMs = 100_000L)
+        val tracks = listOf(testTrack(id = 1L, bookId = 1L, durationMs = 100_000L, sequenceOrder = 0))
+        booksWithProgressFlow.value = listOf(BookWithProgress(book, null, 0f))
+        currentBookIdFlow.value = 1L
+        coEvery { mockRepository.getBookWithTracks(1L) } returns (book to tracks)
+        playerStateFlow.value = PlayerState(currentPositionMs = 25_000L)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.libraryBooks.test {
+            assertEquals(0.25f, awaitItem().single().progressFraction)
+
+            playerStateFlow.value = PlayerState(currentPositionMs = 25_200L)
+            advanceUntilIdle()
+            expectNoEvents()
+
+            playerStateFlow.value = PlayerState(currentPositionMs = 25_999L)
+            advanceUntilIdle()
+            expectNoEvents()
+
+            playerStateFlow.value = PlayerState(currentPositionMs = 26_000L)
+            advanceUntilIdle()
+            assertEquals(0.26f, awaitItem().single().progressFraction)
+            cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    @Test
+    fun givenActiveBook_whenPlayStateChangesWithinOneSecond_thenContinueStatusUpdatesImmediately() = runTest {
+        booksWithProgressFlow.value = listOf(
+            BookWithProgress(testBook(id = 1L, title = "Active"), testProgress(bookId = 1L), 0.2f),
+        )
+        currentBookIdFlow.value = 1L
+        playerStateFlow.value = PlayerState(currentPositionMs = 500L)
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+        assertEquals(ContinueBookStatus.PAUSED, vm.continueBook.value?.status)
+
+        playerStateFlow.value = playerStateFlow.value.copy(isPlaying = true, currentPositionMs = 750L)
+        advanceUntilIdle()
+
+        assertEquals(ContinueBookStatus.PLAYING, vm.continueBook.value?.status)
+    }
+
+    @Test
     fun givenNoSavedSortOption_whenObservingLibraryBooks_thenNewestBookComesFirst() = runTest {
         booksWithProgressFlow.value = listOf(
             BookWithProgress(testBook(id = 1L, addedAt = 100L), null, 0f),
@@ -459,7 +507,7 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun givenLastPlayedBook_whenObservingContinueBook_thenContinueSectionUsesThatBook() = runTest {
+    fun givenLastPlayedBook_whenObservingLibrary_thenBookAppearsInContinueAndFullListOnce() = runTest {
         val firstBook = BookWithProgress(testBook(id = 1L, title = "Alpha"), null, 0f)
         val lastPlayedProgress = testProgress(bookId = 2L, lastUpdated = 2_000L)
         val secondBook = BookWithProgress(testBook(id = 2L, title = "Beta"), lastPlayedProgress, 0.4f)
@@ -471,11 +519,13 @@ class LibraryViewModelTest {
 
         assertEquals(2L, vm.continueBook.value?.book?.book?.id)
         assertEquals(ContinueBookStatus.CONTINUE, vm.continueBook.value?.status)
-        assertEquals(listOf(1L), vm.libraryBooks.value.map { it.book.id })
+        val libraryBookIds = vm.libraryBooks.value.map { it.book.id }
+        assertEquals(2, libraryBookIds.size)
+        assertEquals(setOf(1L, 2L), libraryBookIds.toSet())
     }
 
     @Test
-    fun givenActiveBook_whenObservingContinueBook_thenActiveBookOverridesLastPlayed() = runTest {
+    fun givenActiveBook_whenObservingLibrary_thenActiveBookAppearsInContinueAndFullListOnce() = runTest {
         val activeBook = BookWithProgress(testBook(id = 1L, title = "Active"), testProgress(bookId = 1L), 0.2f)
         val lastPlayedBook = BookWithProgress(testBook(id = 2L, title = "Saved"), testProgress(bookId = 2L), 0.4f)
         booksWithProgressFlow.value = listOf(activeBook, lastPlayedBook)
@@ -488,7 +538,9 @@ class LibraryViewModelTest {
 
         assertEquals(1L, vm.continueBook.value?.book?.book?.id)
         assertEquals(ContinueBookStatus.PLAYING, vm.continueBook.value?.status)
-        assertEquals(listOf(2L), vm.libraryBooks.value.map { it.book.id })
+        val libraryBookIds = vm.libraryBooks.value.map { it.book.id }
+        assertEquals(2, libraryBookIds.size)
+        assertEquals(setOf(1L, 2L), libraryBookIds.toSet())
     }
 
     @Test
@@ -506,11 +558,11 @@ class LibraryViewModelTest {
 
         assertEquals(3L, vm.continueBook.value?.book?.book?.id)
         assertEquals(ContinueBookStatus.CONTINUE, vm.continueBook.value?.status)
-        assertTrue(vm.libraryBooks.value.isEmpty())
+        assertEquals(listOf(3L), vm.libraryBooks.value.map { it.book.id })
     }
 
     @Test
-    fun givenUnavailableLastPlayedBook_whenObservingContinueBook_thenShowsLastPlayedStatus() = runTest {
+    fun givenUnavailableLastPlayedBook_whenObservingContinueBook_thenShowsLastPlayedStatusAndInList() = runTest {
         val unavailableBook = BookWithProgress(
             testBook(id = 4L, title = "Missing", isAvailable = false),
             testProgress(bookId = 4L),
@@ -524,6 +576,6 @@ class LibraryViewModelTest {
 
         assertEquals(4L, vm.continueBook.value?.book?.book?.id)
         assertEquals(ContinueBookStatus.LAST_PLAYED, vm.continueBook.value?.status)
-        assertTrue(vm.libraryBooks.value.isEmpty())
+        assertEquals(listOf(4L), vm.libraryBooks.value.map { it.book.id })
     }
 }

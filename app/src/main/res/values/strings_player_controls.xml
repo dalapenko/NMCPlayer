@@ -1,0 +1,21 @@
+<resources>
+    <string name="control_done">Done</string>
+    <string name="control_close">Close</string>
+    <string name="control_speed_title">Playback speed</string>
+    <string name="control_speed_value">%1$s×</string>
+    <string name="control_speed_preset">%1$s×</string>
+    <string name="control_speed_step">±0.05×</string>
+    <string name="control_speed_fine_tune">Fine-tune speed · 0.5×–2×</string>
+    <string name="control_speed_increase">Increase speed</string>
+    <string name="control_speed_decrease">Decrease speed</string>
+    <string name="control_sleep_timer_title">Sleep timer</string>
+    <string name="control_sleep_timer_after_time">After time</string>
+    <string name="control_sleep_timer_end_of_file">At end of file</string>
+    <string name="control_sleep_timer_end_of_file_description">Playback will stop when this file ends (%1$s remaining).</string>
+    <string name="control_sleep_timer_time_description">Playback will stop after %1$d minutes.</string>
+    <string name="control_sleep_timer_active_description">Playback will stop in</string>
+    <string name="control_sleep_timer_minutes">%1$d min</string>
+    <string name="control_sleep_timer_minutes_label">minutes</string>
+    <string name="control_sleep_timer_start">Enable timer</string>
+    <string name="control_sleep_timer_cancel">Cancel timer</string>
+</resources>

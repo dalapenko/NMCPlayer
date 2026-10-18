@@ -15,17 +15,18 @@ class PlayerScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
         viewBuilderAction = { hasTestTag("player_screen") }
     ) {
 
-    val backButton: KNode = child {
-        hasTestTag("back_button")
-    }
 
     val playerBookTitle: KNode = child {
         hasTestTag("player_book_title")
     }
-
-    val chaptersButton: KNode = child {
-        hasTestTag("chapters_button")
+    val playerBookName: KNode = child {
+        hasTestTag("player_book_name")
     }
+
+    val overflowButton: KNode = child {
+        hasTestTag("player_overflow_button")
+    }
+
 
     val playPauseButton: KNode = child {
         hasTestTag("play_pause_button")
@@ -55,11 +56,4 @@ class PlayerScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
         hasTestTag("speed_control")
     }
 
-    val speedText: KNode = child {
-        hasTestTag("speed_text")
-    }
-
-    val speedSlider: KNode = child {
-        hasTestTag("speed_slider")
-    }
 }
