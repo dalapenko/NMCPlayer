@@ -11,7 +11,7 @@ permissions:
 jobs:
   release:
     name: Detekt · Lint · Tests · Signed Release Build
-    if: github.repository == 'dalapenko/laba'
+    if: github.repository_id == '1165603705'
     runs-on: ubuntu-latest
 
     steps:

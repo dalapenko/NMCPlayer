@@ -13,7 +13,7 @@ permissions:
 jobs:
   check:
     name: Detekt · Lint · Unit Tests
-    if: github.repository == 'dalapenko/laba'
+    if: github.repository_id == '1165603705'
     runs-on: ubuntu-latest
 
     steps:

@@ -17,7 +17,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to GitHub Pages
-    if: github.repository == 'dalapenko/laba'
+    if: github.repository_id == '1165603705'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
