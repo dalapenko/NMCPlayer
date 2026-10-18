@@ -13,7 +13,21 @@ No accounts. No cloud. Just your books.
 
 ---
 
----
+## Screenshots
+
+### Library
+
+| Light | Dark |
+|---|---|
+| ![Library screen in light theme](./assets/screenshots/library-light.jpg) | ![Library screen in dark theme](./assets/screenshots/library-dark.jpg) |
+
+### Player
+
+| Light | Dark |
+|---|---|
+| ![Player screen in light theme](./assets/screenshots/player-light.jpg) | ![Player screen in dark theme](./assets/screenshots/player-dark.jpg) |
+
+*Book titles and author names in these examples are fictional.*
 
 ## Features
 
