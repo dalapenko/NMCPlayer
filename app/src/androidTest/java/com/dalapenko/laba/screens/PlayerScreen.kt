@@ -27,11 +27,6 @@ class PlayerScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
         hasTestTag("player_overflow_button")
     }
 
-
-    val playPauseButton: KNode = child {
-        hasTestTag("play_pause_button")
-    }
-
     val rewindButton: KNode = child {
         hasTestTag("rewind_button")
     }
@@ -46,10 +41,6 @@ class PlayerScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
 
     val nextChapterButton: KNode = child {
         hasTestTag("next_chapter_button")
-    }
-
-    val positionSlider: KNode = child {
-        hasTestTag("position_slider")
     }
 
     val speedControl: KNode = child {

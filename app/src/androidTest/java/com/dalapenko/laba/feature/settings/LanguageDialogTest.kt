@@ -1,7 +1,8 @@
 package com.dalapenko.laba.feature.settings
 
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertEquals
@@ -12,7 +13,7 @@ import org.junit.Test
 
 class LanguageDialogTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun selectingLanguageAppliesOnlyAfterDone() {

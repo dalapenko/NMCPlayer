@@ -1576,10 +1576,10 @@ private fun ContinueListeningSection(
 
 @Composable
 private fun BookCardContent(
+    modifier: Modifier = Modifier,
     bookWithProgress: BookWithProgress,
     statusLabel: String? = null,
     compactRow: Boolean = false,
-    modifier: Modifier = Modifier,
 ) {
     val book = bookWithProgress.book
     val fraction = bookWithProgress.progressFraction

@@ -1,8 +1,9 @@
 package com.dalapenko.laba.screens
 
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.dalapenko.laba.feature.player.SleepTimerBottomSheet
@@ -13,7 +14,7 @@ import org.junit.Test
 
 class SleepTimerBottomSheetTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun presetStartsFixedTimerAndEndOfFileModeUsesExistingCallback() {
