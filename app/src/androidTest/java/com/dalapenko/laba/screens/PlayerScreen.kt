@@ -47,4 +47,30 @@ class PlayerScreen(semanticsProvider: SemanticsNodeInteractionsProvider) :
         hasTestTag("speed_control")
     }
 
+    val speedValue: KNode = child {
+        hasTestTag("speed_value")
+    }
+
+    val speedSlider: KNode = child {
+        hasTestTag("speed_slider")
+    }
+
+    val speedDecreaseButton: KNode = child {
+        hasTestTag("speed_decrease")
+    }
+
+    val speedIncreaseButton: KNode = child {
+        hasTestTag("speed_increase")
+    }
+
+    val speedPreset1_5x: KNode = child {
+        hasTestTag("speed_preset_3")
+    }
+    val totalProgressInfo: KNode = child {
+        hasTestTag("total_progress_info")
+    }
+
+    val positionSlider: KNode = child {
+        hasTestTag("position_slider")
+    }
 }

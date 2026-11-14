@@ -64,7 +64,7 @@ private fun navigationForwardOffsetPx(): Int {
 fun AppNavHost(backStack: NavBackStack<NavKey>) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val forwardOffsetPx = navigationForwardOffsetPx()
-        val openFilesOnEntry = maxWidth >= 1200.dp
+        val tabletSupportingPane = maxWidth >= 1200.dp
         val supportingPaneHeight = maxHeight * SUPPORTING_PANE_HEIGHT_FRACTION
         NavDisplay(
             backStack = backStack,
@@ -80,31 +80,13 @@ fun AppNavHost(backStack: NavBackStack<NavKey>) {
             entryProvider = entryProvider {
                 entry<Library> {
                     LibraryScreen(
-                        onBookClick = { bookId ->
-                            backStack.add(Player(bookId))
-                            if (openFilesOnEntry) backStack.add(PlayerFiles(bookId))
-                        },
+                        onBookClick = { bookId -> backStack.add(Player(bookId)) },
                         onSettingsClick = { backStack.add(Settings) },
                     )
                 }
                 entry<Settings> { SettingsScreen(onBack = { backStack.removeLastOrNull() }) }
                 entry<Player>(metadata = SupportingPaneSceneStrategy.mainPane()) { route ->
-                    PlayerScreen(
-                        bookId = route.bookId,
-                        autoPlay = route.autoPlay,
-                        onBack = {
-                            if (backStack.lastOrNull() == PlayerFiles(route.bookId)) {
-                                backStack.removeLastOrNull()
-                            }
-                            backStack.removeLastOrNull()
-                        },
-                        onOpenFiles = {
-                            if (backStack.lastOrNull() != PlayerFiles(route.bookId)) {
-                                backStack.add(PlayerFiles(route.bookId))
-                            }
-                        },
-                        filesInPane = openFilesOnEntry,
-                    )
+                    PlayerEntryContent(backStack, route, tabletSupportingPane)
                 }
                 entry<PlayerFiles>(metadata = SupportingPaneSceneStrategy.supportingPane()) { route ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -119,4 +101,36 @@ fun AppNavHost(backStack: NavBackStack<NavKey>) {
             },
         )
     }
+}
+
+@Composable
+private fun PlayerEntryContent(
+    backStack: NavBackStack<NavKey>,
+    route: Player,
+    tabletSupportingPane: Boolean,
+) {
+    val filesInPane = backStack.lastOrNull() == PlayerFiles(route.bookId)
+    PlayerScreen(
+        bookId = route.bookId,
+        autoPlay = route.autoPlay,
+        onBack = {
+            if (backStack.lastOrNull() == PlayerFiles(route.bookId)) {
+                backStack.removeLastOrNull()
+            }
+            backStack.removeLastOrNull()
+        },
+        onOpenFiles = {
+            if (backStack.none { it == PlayerFiles(route.bookId) }) {
+                backStack.add(PlayerFiles(route.bookId))
+            }
+        },
+        filesInPane = filesInPane,
+        onPlayerStateLoaded = { trackCount ->
+            if (tabletSupportingPane && trackCount > 1 &&
+                backStack.none { it == PlayerFiles(route.bookId) }
+            ) {
+                backStack.add(PlayerFiles(route.bookId))
+            }
+        },
+    )
 }

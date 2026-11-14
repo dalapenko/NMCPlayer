@@ -33,18 +33,18 @@ class SleepTimerDialMathTest {
     }
 
     @Test
-    fun givenOneHundredTwentyOneMinutes_whenRingCount_thenThreeRings() {
-        assertEquals(3, ringCountForMinutes(121))
+    fun givenOneHundredTwentyOneMinutes_whenRingCount_thenTwoRings() {
+        assertEquals(2, ringCountForMinutes(121))
     }
 
     @Test
-    fun givenMaxMinutes_whenRingCount_thenThreeRings() {
-        assertEquals(3, ringCountForMinutes(SLEEP_TIMER_MAX_MINUTES))
+    fun givenMaxMinutes_whenRingCount_thenTwoRings() {
+        assertEquals(2, ringCountForMinutes(SLEEP_TIMER_MAX_MINUTES))
     }
 
     @Test
-    fun givenValueAboveMax_whenRingCount_thenClampedToThreeRings() {
-        assertEquals(3, ringCountForMinutes(500))
+    fun givenValueAboveMax_whenRingCount_thenClampedToTwoRings() {
+        assertEquals(2, ringCountForMinutes(500))
     }
 
     // ── minutesToDialPosition ─────────────────────────────────────────────────
@@ -85,15 +85,15 @@ class SleepTimerDialMathTest {
     }
 
     @Test
-    fun givenMaxMinutes_whenDialPosition_thenLapTwoFullSweep() {
+    fun givenMaxMinutes_whenDialPosition_thenLapOneFullSweep() {
         val position = minutesToDialPosition(SLEEP_TIMER_MAX_MINUTES)
-        assertEquals(2, position.lapIndex)
+        assertEquals(1, position.lapIndex)
         assertEquals(360f, position.angleDegrees)
     }
 
     @Test
     fun givenValueAboveMax_whenDialPosition_thenClampedToMax() {
-        assertEquals(minutesToDialPosition(SLEEP_TIMER_MAX_MINUTES), minutesToDialPosition(500))
+        assertEquals(minutesToDialPosition(120), minutesToDialPosition(500))
     }
 
     // ── touchAngleDegrees ─────────────────────────────────────────────────────
@@ -155,5 +155,20 @@ class SleepTimerDialMathTest {
     @Test
     fun givenZeroDegrees_whenMinutesDelta_thenZero() {
         assertEquals(0, accumulatedAngleToMinutesDelta(0f))
+    }
+
+    @Test
+    fun givenDragBeyondMaximum_whenMinutesAfterDrag_thenClampedTo120() {
+        assertEquals(120, minutesAfterDrag(valueAtDragStart = 115, accumulatedDegrees = 90f))
+    }
+
+    @Test
+    fun givenDragBelowZero_whenMinutesAfterDrag_thenClampedToZero() {
+        assertEquals(0, minutesAfterDrag(valueAtDragStart = 5, accumulatedDegrees = -90f))
+    }
+
+    @Test
+    fun givenMultipleTurns_whenMinutesAfterDrag_thenAccumulatesTurnsWithinMaximum() {
+        assertEquals(90, minutesAfterDrag(valueAtDragStart = 0, accumulatedDegrees = 540f))
     }
 }

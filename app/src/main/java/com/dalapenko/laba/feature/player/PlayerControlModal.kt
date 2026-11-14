@@ -30,6 +30,7 @@ private const val SHEET_HANDLE_CORNER_RADIUS_DP = 50
 private const val CONTROL_PANEL_MAX_HEIGHT_FRACTION = 0.82f
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod") // Wide and narrow modal layouts share dismissal and content behavior.
 @Composable
 internal fun PlayerControlModal(
     isWide: Boolean,
@@ -86,7 +87,13 @@ internal fun PlayerControlModal(
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
-            content()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                content()
+            }
         }
     }
 }

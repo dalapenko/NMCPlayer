@@ -34,13 +34,15 @@ import kotlin.math.min
 import kotlin.math.sin
 
 private val DIAL_DIAMETER = 140.dp
-private val LABEL_AREA = 16.dp
-private val TOTAL_DIAMETER = DIAL_DIAMETER + LABEL_AREA * 2
 private val RING_STROKE_WIDTH = 6.dp
+private val LABEL_CLEARANCE = 8.dp
+private val LABEL_HALF_EXTENT = 12.dp
+private val LABEL_AREA = RING_STROKE_WIDTH / 2 + LABEL_CLEARANCE + LABEL_HALF_EXTENT * 2
+private val TOTAL_DIAMETER = DIAL_DIAMETER + LABEL_AREA * 2
 private val RING_SPACING = 22.dp
 private val THUMB_RADIUS = 9.dp
 
-/** Round drag-to-set dial for the sleep timer: 0..180 minutes across up to 3 concentric 60-minute laps. */
+/** Round drag-to-set dial for the sleep timer: 0..120 minutes across up to 2 concentric 60-minute laps. */
 @Composable
 fun SleepTimerDial(
     minutes: Int,
@@ -63,7 +65,9 @@ fun SleepTimerDial(
             .testTag("sleep_timer_dial"),
         contentAlignment = Alignment.Center,
     ) {
-        SleepTimerDialLabels(radius = DIAL_DIAMETER / 2 + LABEL_AREA / 2)
+        SleepTimerDialLabels(
+            radius = DIAL_DIAMETER / 2 + RING_STROKE_WIDTH / 2 + LABEL_CLEARANCE + LABEL_HALF_EXTENT,
+        )
 
         Canvas(
             modifier = Modifier
@@ -84,9 +88,7 @@ fun SleepTimerDial(
                             )
                             accumulatedAngle += angleDelta(dragStartAngle, currentAngle)
                             dragStartAngle = currentAngle
-                            val newValue = (valueAtDragStart + accumulatedAngleToMinutesDelta(accumulatedAngle))
-                                .coerceIn(0, SLEEP_TIMER_MAX_MINUTES)
-                            onMinutesChangedState(newValue)
+                            onMinutesChangedState(minutesAfterDrag(valueAtDragStart, accumulatedAngle))
                         },
                     )
                 },

@@ -18,6 +18,7 @@ app/google-services.json
 # AI
 .claude
 .omp/**
+.opencode/**
 .agents/**
 .agent-work/**
 .codex/**

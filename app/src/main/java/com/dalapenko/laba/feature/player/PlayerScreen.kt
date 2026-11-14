@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,12 +33,8 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -45,7 +42,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -60,18 +56,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -88,15 +88,15 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 private val PLAYER_WIDE_LAYOUT_MIN_WIDTH = 720.dp
-private val PLAYER_COVER_SIZE = 240.dp
-private val WIDE_PLAYER_COVER_SIZE = 224.dp
+private val PLAYER_COVER_SIZE = 237.dp
+private val WIDE_PLAYER_COVER_SIZE = 237.dp
 private val WIDE_PLAYER_COVER_METADATA_SPACE = 120.dp
-private val PLAYER_CARD_CORNER = 20.dp
 private val LANDSCAPE_TRANSPORT_ICON_SIZE = 32.dp
 private val LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE = 56.dp
 private val PORTRAIT_TRANSPORT_ICON_SIZE = 36.dp
 private val PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE = 64.dp
 private const val PLAYER_PANEL_MAX_HEIGHT_FRACTION = 0.82f
+
 private data class PlaybackDisplayState(
     val title: String,
     val author: String?,
@@ -106,13 +106,13 @@ private data class PlaybackDisplayState(
     val trackCount: Int,
     val position: Float,
     val duration: Float,
+    val progress: Float,
     val currentPositionMs: Long,
     val durationMs: Long,
     val isSeeking: Boolean,
     val seekPosition: Float,
     val isPlaying: Boolean,
     val playbackSpeed: Float,
-    val progress: Float,
     val remainingMs: Long,
     val isPreviousEnabled: Boolean,
     val isNextEnabled: Boolean,
@@ -135,9 +135,17 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onOpenFiles: () -> Unit,
     filesInPane: Boolean = false,
+    onPlayerStateLoaded: (trackCount: Int) -> Unit = {},
     viewModel: PlayerViewModel = koinViewModel { parametersOf(bookId, autoPlay) },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var reportedLoaded by rememberSaveable(bookId) { mutableStateOf(false) }
+    LaunchedEffect(uiState.isLoading, uiState.isInitializing, uiState.tracks.size) {
+        if (!uiState.isLoading && !uiState.isInitializing && !reportedLoaded) {
+            reportedLoaded = true
+            onPlayerStateLoaded(uiState.tracks.size)
+        }
+    }
     var unavailableTrack by remember { mutableStateOf<PlayerEvent.TrackUnavailable?>(null) }
     PlayerEventEffect(
         events = viewModel.events,
@@ -282,18 +290,34 @@ private fun PlayerScaffold(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isWide = maxWidth >= PLAYER_WIDE_LAYOUT_MIN_WIDTH
         val panelMaxHeight = maxHeight * PLAYER_PANEL_MAX_HEIGHT_FRACTION
-        val openFiles = { if (filesInPane) onOpenFiles() else showFiles = true }
+        val isTabletLayout = maxWidth >= 1200.dp || filesInPane
+        val openFiles = { if (isTabletLayout) onOpenFiles() else showFiles = true }
+        val showFilesAction = !isTabletLayout || (uiState.tracks.size > 1 && !filesInPane)
         Scaffold(
             modifier = Modifier.testTag("player_screen"),
             topBar = {
-                PlayerTopBar(
-                    onBack = onBack,
-                    onOpenFiles = openFiles,
-                    onShowChapters = { showChapters = true },
-                    onShowSleepTimer = { showSleepTimer = true },
-                    chaptersEnabled = uiState.tracks.size > 1,
-                    sleepTimerActive = uiState.sleepTimerState.isActive,
-                )
+                Column {
+                    PlayerTopBar(
+                        onBack = onBack,
+                        onOpenFiles = openFiles,
+                        showFilesAction = showFilesAction,
+                        onShowChapters = { showChapters = true },
+                        onShowSleepTimer = { showSleepTimer = true },
+                        chaptersEnabled = uiState.tracks.size > 1,
+                    )
+                    if (uiState.sleepTimerState.isActive) {
+                        Text(
+                            stringResource(
+                                R.string.player_active_timer_status,
+                                formatTime(uiState.sleepTimerState.remainingMs),
+                            ),
+                            modifier = Modifier.fillMaxWidth().testTag("player_active_timer_status")
+                                .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
             },
         ) { padding ->
             if (uiState.isLoading || uiState.isInitializing) {
@@ -303,10 +327,10 @@ private fun PlayerScaffold(
                     uiState = uiState,
                     playerState = playerState,
                     isWide = isWide,
+                    isTabletLayout = isTabletLayout,
                     padding = padding,
-                    onOpenFiles = openFiles,
-                    onShowSleepTimer = { showSleepTimer = true },
                     onShowSpeed = { showSpeed = true },
+                    onSetSpeed = onSetSpeed,
                     onSeekTo = onSeekTo,
                     onSkipToTrack = onSkipToTrack,
                     onSeekBack = onSeekBack,
@@ -315,89 +339,29 @@ private fun PlayerScaffold(
                 )
             }
         }
-        if (showFiles) {
-            if (maxWidth < 600.dp) {
-                ModalBottomSheet(onDismissRequest = { showFiles = false }) {
-                    PlayerFilesScreen(
-                        bookId = bookId,
-                        onBack = { showFiles = false },
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
-                    )
-                }
-            } else {
-                Dialog(
-                    onDismissRequest = { showFiles = false },
-                    properties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                        decorFitsSystemWindows = false,
-                    ),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                        Surface(
-                            modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight),
-                            shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 6.dp,
-                        ) {
-                            PlayerFilesScreen(
-                                bookId = bookId,
-                                onBack = { showFiles = false },
-                                maxPanelHeight = panelMaxHeight,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        PlayerFilesOverlay(
+            visible = showFiles,
+            bookId = bookId,
+            narrow = maxWidth < 600.dp,
+            panelMaxHeight = panelMaxHeight,
+            onDismiss = { showFiles = false },
+        )
         trackUnavailable?.let { error ->
-            val fallbackName = stringResource(R.string.fallback_track_name)
-            val fileName = error.trackName ?: String.format(fallbackName, error.trackIndex + 1)
-            val canRetry = error.trackIndex in uiState.tracks.indices
-            val retry = {
-                onRetryTrack(error.trackIndex)
-                onDismissTrackUnavailable()
-            }
-            val chooseAnotherFile = {
-                onDismissTrackUnavailable()
-                openFiles()
-            }
-            if (maxWidth < 600.dp && !filesInPane) {
-                ModalBottomSheet(
-                    onDismissRequest = onDismissTrackUnavailable,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.testTag("player_audio_error_sheet"),
-                ) {
-                    AudioFileErrorContent(fileName, canRetry, onDismissTrackUnavailable, retry, chooseAnotherFile)
-                }
-            } else {
-                Dialog(
-                    onDismissRequest = onDismissTrackUnavailable,
-                    properties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                        decorFitsSystemWindows = false,
-                    ),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
-                        Surface(
-                            modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight)
-                                .testTag("player_audio_error_sheet"),
-                            shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 6.dp,
-                        ) {
-                            AudioFileErrorContent(
-                                fileName = fileName,
-                                canRetry = canRetry,
-                                onDismiss = onDismissTrackUnavailable,
-                                onRetry = retry,
-                                onChooseAnotherFile = chooseAnotherFile,
-                                modifier = Modifier.verticalScroll(rememberScrollState()),
-                            )
-                        }
-                    }
-                }
-            }
+            TrackUnavailableOverlay(
+                error = error,
+                canRetry = error.trackIndex in uiState.tracks.indices,
+                narrow = maxWidth < 600.dp && !filesInPane,
+                panelMaxHeight = panelMaxHeight,
+                onDismiss = onDismissTrackUnavailable,
+                onRetry = {
+                    onRetryTrack(error.trackIndex)
+                    onDismissTrackUnavailable()
+                },
+                onChooseAnotherFile = {
+                    onDismissTrackUnavailable()
+                    openFiles()
+                },
+            )
         }
         if (showChapters) {
             ChapterBottomSheet(
@@ -447,22 +411,121 @@ private fun PlayerScaffold(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerFilesOverlay(
+    visible: Boolean,
+    bookId: Long,
+    narrow: Boolean,
+    panelMaxHeight: Dp,
+    onDismiss: () -> Unit,
+) {
+    if (visible) {
+        if (narrow) {
+            ModalBottomSheet(onDismissRequest = onDismiss) {
+                PlayerFilesScreen(
+                    bookId = bookId,
+                    onBack = onDismiss,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
+                )
+            }
+        } else {
+            Dialog(
+                onDismissRequest = onDismiss,
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                    Surface(
+                        modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight),
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 6.dp,
+                    ) {
+                        PlayerFilesScreen(
+                            bookId = bookId,
+                            onBack = onDismiss,
+                            maxPanelHeight = panelMaxHeight,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackUnavailableOverlay(
+    error: PlayerEvent.TrackUnavailable,
+    canRetry: Boolean,
+    narrow: Boolean,
+    panelMaxHeight: Dp,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+    onChooseAnotherFile: () -> Unit,
+) {
+    val fallbackName = stringResource(R.string.fallback_track_name)
+    val fileName = error.trackName ?: String.format(fallbackName, error.trackIndex + 1)
+    if (narrow) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.testTag("player_audio_error_sheet"),
+        ) {
+            AudioFileErrorContent(fileName, canRetry, onDismiss, onRetry, onChooseAnotherFile)
+        }
+    } else {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
+                Surface(
+                    modifier = Modifier.width(420.dp).heightIn(max = panelMaxHeight)
+                        .testTag("player_audio_error_sheet"),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                ) {
+                    AudioFileErrorContent(
+                        fileName = fileName,
+                        canRetry = canRetry,
+                        onDismiss = onDismiss,
+                        onRetry = onRetry,
+                        onChooseAnotherFile = onChooseAnotherFile,
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerTopBar(
     onBack: () -> Unit,
     onOpenFiles: () -> Unit,
+    showFilesAction: Boolean,
     onShowChapters: () -> Unit,
     onShowSleepTimer: () -> Unit,
     chaptersEnabled: Boolean,
-    sleepTimerActive: Boolean,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
             Text(
                 stringResource(R.string.player_now_listening),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("player_book_title"),
             )
         },
@@ -472,46 +535,25 @@ private fun PlayerTopBar(
             }
         },
         actions = {
+            if (showFilesAction) {
+                IconButton(onClick = onOpenFiles, modifier = Modifier.testTag("open_player_files_button")) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ListAlt,
+                        contentDescription = stringResource(R.string.player_action_files),
+                    )
+                }
+            }
+            IconButton(onClick = onShowSleepTimer, modifier = Modifier.testTag("player_timer_control")) {
+                Icon(
+                    Icons.Outlined.AccessTime,
+                    contentDescription = stringResource(R.string.player_action_timer),
+                )
+            }
             Box {
                 IconButton(onClick = { menuExpanded = true }, modifier = Modifier.testTag("player_overflow_button")) {
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.player_more_options))
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.player_close)) },
-                        onClick = {
-                            menuExpanded = false
-                            onBack()
-                        },
-                        modifier = Modifier.testTag("player_close_menu_item"),
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.player_action_files)) },
-                        leadingIcon = { Icon(Icons.Outlined.FolderOpen, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onOpenFiles()
-                        },
-                        modifier = Modifier.testTag("player_files_menu_item"),
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.cd_sleep_timer)) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Outlined.Bedtime,
-                                contentDescription = null,
-                                tint = if (sleepTimerActive) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onShowSleepTimer()
-                        },
-                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.cd_show_chapters)) },
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.ListAlt, contentDescription = null) },
@@ -521,6 +563,14 @@ private fun PlayerTopBar(
                             onShowChapters()
                         },
                         modifier = Modifier.testTag("chapters_button"),
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.player_close)) },
+                        onClick = {
+                            menuExpanded = false
+                            onBack()
+                        },
+                        modifier = Modifier.testTag("player_close_menu_item"),
                     )
                 }
             }
@@ -534,10 +584,10 @@ private fun PlayerContent(
     uiState: PlayerUiState,
     playerState: PlayerState,
     isWide: Boolean,
+    isTabletLayout: Boolean,
     padding: PaddingValues,
-    onOpenFiles: () -> Unit,
-    onShowSleepTimer: () -> Unit,
     onShowSpeed: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
     onSeekTo: (Long) -> Unit,
     onSkipToTrack: (Int) -> Unit,
     onSeekBack: () -> Unit,
@@ -598,9 +648,9 @@ private fun PlayerContent(
         },
     )
     if (isWide) {
-        WidePlayerContent(state, actions, padding, onOpenFiles, onShowSpeed, onShowSleepTimer)
+        WidePlayerContent(state, actions, padding, onShowSpeed, onSetSpeed, isTabletLayout)
     } else {
-        PhonePlayerContent(state, actions, padding, onOpenFiles, onShowSpeed, onShowSleepTimer)
+        PhonePlayerContent(state, actions, padding, onShowSpeed, onSetSpeed)
     }
 }
 
@@ -609,25 +659,31 @@ private fun PhonePlayerContent(
     state: PlaybackDisplayState,
     actions: TransportActions,
     padding: PaddingValues,
-    onOpenFiles: () -> Unit,
     onShowSpeed: () -> Unit,
-    onShowSleepTimer: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-        val availableWidth = maxWidth
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.height(8.dp))
-            CoverArt(state.coverUri, state.title, Modifier.size(minOf(PLAYER_COVER_SIZE, availableWidth)))
+        Box(Modifier.matchParentSize().testTag("player_content_bounds"))
+        PhonePlayerLayout(availableHeight = maxHeight) {
+            Spacer(Modifier.height(48.dp))
+            CoverArt(
+                state.coverUri,
+                state.title,
+                Modifier.testTag("player_cover_art"),
+            )
             Spacer(Modifier.height(12.dp))
             BookInfo(state)
             Spacer(Modifier.height(8.dp))
             TrackInfo(state)
-            Spacer(Modifier.height(8.dp))
+            if (state.trackCount > 1) {
+                Spacer(Modifier.height(8.dp))
+                BookProgress(state, Modifier.padding(horizontal = 24.dp))
+                Spacer(Modifier.height(12.dp))
+            } else {
+                Spacer(Modifier.height(8.dp))
+            }
             ProgressSection(state, actions.onSeekChange, actions.onSeekFinished, Modifier.padding(horizontal = 24.dp))
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             TransportControls(
                 state,
                 actions,
@@ -635,60 +691,186 @@ private fun PhonePlayerContent(
                 PORTRAIT_TRANSPORT_PLAY_BUTTON_SIZE,
                 Modifier.padding(horizontal = 12.dp),
             )
-            Spacer(Modifier.height(8.dp))
-            BookProgress(state, Modifier.padding(horizontal = 24.dp))
-            PlayerCards(state, onShowSpeed, onOpenFiles, onShowSleepTimer)
+            Spacer(Modifier.height(20.dp))
+            InlineSpeedControls(state.playbackSpeed, onShowSpeed, onSetSpeed)
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
+private fun PhonePlayerLayout(
+    availableHeight: Dp,
+    content: @Composable () -> Unit,
+) {
+    Layout(
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+        content = content,
+    ) { measurables, constraints ->
+        val coverIndex = 1
+        val topArtworkSpacingIndex = 0
+        val bottomArtworkSpacingIndex = 2
+        val childConstraints = constraints.copy(minWidth = 0, maxHeight = Constraints.Infinity)
+        val placeables = arrayOfNulls<Placeable>(measurables.size)
+        var reservedHeight = 0
+        measurables.forEachIndexed { index, measurable ->
+            if (index != coverIndex && index != topArtworkSpacingIndex && index != bottomArtworkSpacingIndex) {
+                val placeable = measurable.measure(childConstraints)
+                placeables[index] = placeable
+                reservedHeight += placeable.height
+            }
+        }
+        val availableHeightPx = availableHeight.roundToPx()
+        val budget = playerArtworkBudget(
+            availableHeight = availableHeightPx,
+            reservedHeight = reservedHeight,
+            availableWidth = constraints.maxWidth,
+            maxCoverSize = PLAYER_COVER_SIZE.roundToPx(),
+            desiredSpacing = PlayerArtworkSpacing(48.dp.roundToPx(), 12.dp.roundToPx()),
+        )
+        placeables[topArtworkSpacingIndex] =
+            measurables[topArtworkSpacingIndex].measure(Constraints.fixed(0, budget.topSpacing))
+        placeables[coverIndex] =
+            measurables[coverIndex].measure(Constraints.fixed(budget.coverSize, budget.coverSize))
+        placeables[bottomArtworkSpacingIndex] =
+            measurables[bottomArtworkSpacingIndex].measure(Constraints.fixed(0, budget.bottomSpacing))
+        val layoutHeight = maxOf(budget.contentHeight, availableHeightPx)
+        layout(constraints.maxWidth, layoutHeight) {
+            var y = 0
+            placeables.forEachIndexed { index, placeable ->
+                placeable!!.placeRelative(
+                    x = if (index == coverIndex) centeredPlayerChildX(constraints.maxWidth, placeable.width) else 0,
+                    y = y,
+                )
+                y += placeable.height
+            }
+        }
+    }
+}
+
+internal data class PlayerArtworkBudget(
+    val topSpacing: Int,
+    val bottomSpacing: Int,
+    val coverSize: Int,
+    val contentHeight: Int,
+)
+
+internal data class PlayerArtworkSpacing(val top: Int, val bottom: Int)
+
+internal fun playerArtworkBudget(
+    availableHeight: Int,
+    reservedHeight: Int,
+    availableWidth: Int,
+    maxCoverSize: Int,
+    desiredSpacing: PlayerArtworkSpacing,
+): PlayerArtworkBudget {
+    val remainingHeight = (availableHeight - reservedHeight).coerceAtLeast(0)
+    val desiredSpacingTotal = desiredSpacing.top + desiredSpacing.bottom
+    val artworkSpacing = minOf(remainingHeight, desiredSpacingTotal)
+    val topSpacing = if (desiredSpacingTotal == 0) {
+        0
+    } else {
+        artworkSpacing * desiredSpacing.top / desiredSpacingTotal
+    }
+    val bottomSpacing = artworkSpacing - topSpacing
+    val coverSize = minOf(maxCoverSize, availableWidth, remainingHeight - artworkSpacing)
+    return PlayerArtworkBudget(
+        topSpacing = topSpacing,
+        bottomSpacing = bottomSpacing,
+        coverSize = coverSize,
+        contentHeight = reservedHeight + artworkSpacing + coverSize,
+    )
+}
+
+internal fun centeredPlayerChildX(layoutWidth: Int, childWidth: Int): Int =
+    ((layoutWidth - childWidth) / 2).coerceAtLeast(0)
+
+@Composable
 private fun WidePlayerContent(
     state: PlaybackDisplayState,
     actions: TransportActions,
     padding: PaddingValues,
-    onOpenFiles: () -> Unit,
     onShowSpeed: () -> Unit,
-    onShowSleepTimer: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
+    tabletLayout: Boolean,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         val compact = maxHeight < 500.dp
+        val tabletMainPane = tabletLayout
         val coverSize = minOf(
             WIDE_PLAYER_COVER_SIZE,
             (maxHeight - WIDE_PLAYER_COVER_METADATA_SPACE).coerceAtLeast(120.dp),
         )
-        val controlsScrollModifier = if (compact) Modifier else Modifier.verticalScroll(rememberScrollState())
+        Box(Modifier.matchParentSize().testTag("player_content_bounds"))
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = if (compact) 0.dp else 8.dp),
+            modifier = Modifier.fillMaxHeight()
+                .widthIn(max = if (tabletMainPane) 848.dp else maxWidth)
+                .fillMaxWidth()
+                .align(Alignment.TopStart)
+                .padding(
+                    start = if (tabletMainPane) 0.dp else 24.dp,
+                    top = if (compact) 0.dp else 8.dp,
+                    end = if (tabletMainPane) 60.dp else 24.dp,
+                    bottom = if (compact) 0.dp else 8.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier
+                    .then(if (tabletMainPane) Modifier.width(424.dp) else Modifier.weight(1f))
+                    .fillMaxHeight()
+                    .padding(start = if (tabletMainPane) 68.dp else 0.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
             ) {
+                Spacer(Modifier.height(if (compact) 0.dp else 76.dp))
                 CoverArt(state.coverUri, state.title, Modifier.size(coverSize))
                 Spacer(Modifier.height(12.dp))
                 BookInfo(state)
             }
-            Spacer(Modifier.width(24.dp))
-            Column(
-                modifier = Modifier.weight(1f).fillMaxHeight().then(controlsScrollModifier),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top,
-            ) {
-                TrackInfo(state, compact)
-                Spacer(Modifier.height(if (compact) 2.dp else 16.dp))
-                ProgressSection(state, actions.onSeekChange, actions.onSeekFinished)
-                Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
-                TransportControls(state, actions, LANDSCAPE_TRANSPORT_ICON_SIZE, LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE)
-                Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
-                BookProgress(state, stacked = !compact, compact = compact)
-                Spacer(Modifier.height(if (compact) 4.dp else 16.dp))
-                PlayerCards(state, onShowSpeed, onOpenFiles, onShowSleepTimer, compact = true)
-            }
+            Spacer(Modifier.width(if (tabletMainPane) 0.dp else 24.dp))
+            WidePlayerControls(
+                state = state,
+                actions = actions,
+                compact = compact,
+                tabletMainPane = tabletMainPane,
+                onShowSpeed = onShowSpeed,
+                onSetSpeed = onSetSpeed,
+                modifier = Modifier.weight(1f),
+            )
         }
+    }
+}
+
+@Composable
+private fun WidePlayerControls(
+    state: PlaybackDisplayState,
+    actions: TransportActions,
+    compact: Boolean,
+    tabletMainPane: Boolean,
+    onShowSpeed: () -> Unit,
+    onSetSpeed: (Float) -> Unit,
+    modifier: Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top,
+    ) {
+        Spacer(Modifier.height(if (compact) 0.dp else if (tabletMainPane) 76.dp else 0.dp))
+        TrackInfo(state, compact = compact)
+        if (state.trackCount > 1) {
+            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+            BookProgress(state, compact = compact)
+            Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
+        } else {
+            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+        }
+        ProgressSection(state, actions.onSeekChange, actions.onSeekFinished)
+        Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
+        TransportControls(state, actions, LANDSCAPE_TRANSPORT_ICON_SIZE, LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE)
+        Spacer(Modifier.height(if (compact) 4.dp else 28.dp))
+        InlineSpeedControls(state.playbackSpeed, onShowSpeed, onSetSpeed, compact = compact)
     }
 }
 
@@ -723,12 +905,17 @@ private fun TrackInfo(state: PlaybackDisplayState, compact: Boolean = false) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (state.trackCount > 0) {
-                Text(position, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            if (state.trackCount > 1) {
+                Text(
+                    position,
+                    modifier = Modifier.testTag("player_file_position"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
             Text(
                 state.trackFileName.orEmpty(),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("player_track_file_name"),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.End,
                 maxLines = 1,
@@ -740,11 +927,17 @@ private fun TrackInfo(state: PlaybackDisplayState, compact: Boolean = false) {
             Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (state.trackCount > 0) {
-                Text(position, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            if (state.trackCount > 1) {
+                Text(
+                    position,
+                    modifier = Modifier.testTag("player_file_position"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
             Text(
                 state.trackFileName.orEmpty(),
+                modifier = Modifier.testTag("player_track_file_name"),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -774,8 +967,22 @@ private fun ProgressSection(
             ).semantics { contentDescription = description },
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTime(displayedPosition), style = MaterialTheme.typography.labelSmall)
-            Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelSmall)
+            Text(
+                formatTime(displayedPosition),
+                modifier = Modifier.testTag("position_elapsed"),
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Text(
+                formatTime(
+                    remainingPlaybackTimeMs(
+                        state.durationMs,
+                        displayedPosition,
+                        state.playbackSpeed,
+                    ),
+                ),
+                modifier = Modifier.testTag("position_remaining"),
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }
@@ -862,128 +1069,18 @@ private fun TransportIconButton(
 private fun BookProgress(
     state: PlaybackDisplayState,
     modifier: Modifier = Modifier,
-    stacked: Boolean = false,
     compact: Boolean = false,
 ) {
-    val remaining = stringResource(R.string.player_time_remaining, formatTime(state.remainingMs))
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                stringResource(R.string.player_listened_percent, (state.progress * 100).roundToInt()),
-                style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-            )
-            if (!stacked) {
-                Text(
-                    remaining,
-                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-        if (stacked) Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
-        LinearProgressIndicator(
-            progress = { state.progress },
-            modifier = Modifier.fillMaxWidth().testTag("book_progress_slider"),
-        )
-        if (stacked) {
-            Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
-            Text(
-                remaining,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.End,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlayerCards(
-    state: PlaybackDisplayState,
-    onShowSpeed: () -> Unit,
-    onOpenFiles: () -> Unit,
-    onShowSleepTimer: () -> Unit,
-    compact: Boolean = false,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(
-            horizontal = 16.dp,
-            vertical = if (compact) 0.dp else 8.dp,
+    val textStyle = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
+    Text(
+        stringResource(
+            R.string.player_total_progress_info,
+            (state.progress * 100).roundToInt(),
+            formatTime(state.remainingMs),
         ),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PlayerActionCard(
-            title = stringResource(R.string.player_action_speed),
-            value = String.format(Locale.ENGLISH, "%.2f×", state.playbackSpeed),
-            icon = Icons.Outlined.Speed,
-            tag = "speed_control",
-            compact = compact,
-            modifier = Modifier.weight(1f),
-            onClick = onShowSpeed,
-        )
-        PlayerActionCard(
-            title = stringResource(R.string.player_action_files),
-            value = stringResource(R.string.player_files_count, state.trackCount),
-            icon = Icons.Outlined.FolderOpen,
-            tag = "open_player_files_button",
-            compact = compact,
-            modifier = Modifier.weight(1f),
-            onClick = onOpenFiles,
-        )
-        PlayerActionCard(
-            title = stringResource(R.string.player_action_timer),
-            value = stringResource(R.string.cd_sleep_timer),
-            icon = Icons.Outlined.Bedtime,
-            tag = "player_timer_control",
-            compact = compact,
-            modifier = Modifier.weight(1f),
-            onClick = onShowSleepTimer,
-        )
-    }
-}
-
-@Composable
-private fun PlayerActionCard(
-    title: String,
-    value: String,
-    icon: ImageVector,
-    tag: String,
-    compact: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.height(if (compact) 56.dp else 84.dp).testTag(tag),
-        shape = RoundedCornerShape(PLAYER_CARD_CORNER),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(
-                horizontal = if (compact) 4.dp else 8.dp,
-                vertical = if (compact) 2.dp else 10.dp,
-            ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(if (compact) 20.dp else 24.dp),
-            )
-            Text(
-                title,
-                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-    }
+        style = textStyle,
+        modifier = modifier.fillMaxWidth().testTag("total_progress_info"),
+    )
 }
 
 @Composable

@@ -1,10 +1,12 @@
 package com.dalapenko.laba
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.filters.LargeTest
 import com.dalapenko.laba.screens.ChapterBottomSheet
 import com.dalapenko.laba.screens.LibraryScreen
@@ -65,11 +67,26 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
                 bookCard(bookId).performClick()
             }
 
-            // Wait for the Navigation 3 transition and for PlayerViewModel.loadBook() to finish.
-            // The app automatically starts playback (autoPlay=true by default).
             withScreen<PlayerScreen> {
                 flakySafely { playerBookTitle.assertIsDisplayed() }
                 playerBookName.assertTextContains(book.bookEntity.title)
+            }
+            check(
+                composeTestRule.onAllNodesWithTag("current_file_progress_info")
+                    .fetchSemanticsNodes().isEmpty(),
+            ) { "Expected the redundant current-file progress row to be absent" }
+            composeTestRule.onNodeWithTag("total_progress_info")
+                .assertIsDisplayed()
+                .assertHasNoClickAction()
+            composeTestRule.onNodeWithTag("player_file_position").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("player_track_file_name").assertIsDisplayed()
+            check(
+                composeTestRule.onAllNodesWithTag("position_slider")
+                    .fetchSemanticsNodes().size == 1
+            ) { "Expected exactly one current-file position slider" }
+            val sliderNode = composeTestRule.onNodeWithTag("position_slider").fetchSemanticsNode()
+            check(sliderNode.config.contains(SemanticsProperties.ProgressBarRangeInfo)) {
+                "Expected the current-file slider to expose progress range semantics"
             }
             
             // Verify playback has started automatically
@@ -78,14 +95,23 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
             }
         }
 
-        step("3. Adjust playback speed to 1.5×") {
+        step("3. Adjust playback speed with inline preset, fine tuning, and bounds") {
             withScreen<PlayerScreen> {
-                speedControl.performClick()
+                speedControl.assertIsDisplayed()
+                speedPreset1_5x.performClick()
             }
-            composeTestRule.onNodeWithTag("speed_increase").assertIsDisplayed()
-            repeat(10) { composeTestRule.onNodeWithTag("speed_increase").performClick() }
-            composeTestRule.onNodeWithTag("speed_value").assertTextContains("1.5", substring = true)
-            composeTestRule.onNodeWithTag("speed_done").performClick()
+            check(playbackController.playerState.value.playbackSpeed in 1.499f..1.501f)
+            composeTestRule.onNodeWithTag("speed_increase").performClick()
+            check(playbackController.playerState.value.playbackSpeed in 1.549f..1.551f)
+            composeTestRule.onNodeWithTag("speed_decrease").performClick()
+            check(playbackController.playerState.value.playbackSpeed in 1.499f..1.501f)
+
+            composeTestRule.onNodeWithTag("speed_preset_4").performClick()
+            composeTestRule.onNodeWithTag("speed_increase").performClick()
+            check(playbackController.playerState.value.playbackSpeed in 1.999f..2.001f)
+            composeTestRule.onNodeWithTag("speed_preset_0").performClick()
+            composeTestRule.onNodeWithTag("speed_decrease").performClick()
+            check(playbackController.playerState.value.playbackSpeed in 0.499f..0.501f)
         }
 
         step("4. Navigate to next chapter") {
@@ -205,10 +231,29 @@ class CompletePlaybackJourneyTest : BaseKaspressoTest() {
 
             withScreen<PlayerScreen> {
                 flakySafely { playerBookTitle.assertIsDisplayed() }
-                speedControl.performClick()
+                check(playbackController.playerState.value.playbackSpeed in 1.499f..1.501f) {
+                    "Expected saved playback speed to be restored"
+                }
             }
-            composeTestRule.onNodeWithTag("speed_value").assertTextContains("1.5", substring = true)
-            composeTestRule.onNodeWithTag("speed_done").performClick()
         }
+        step("10. Start and cancel the sleep timer") {
+            composeTestRule.onNodeWithTag("player_timer_control").performClick()
+            composeTestRule.onNodeWithTag("sleep_timer_preset_15").performClick()
+            composeTestRule.onNodeWithTag("sleep_timer_start_button").performClick()
+            flakySafely {
+                composeTestRule.onNodeWithTag("player_active_timer_status")
+                    .assertIsDisplayed()
+            }
+
+            composeTestRule.onNodeWithTag("player_timer_control").performClick()
+            composeTestRule.onNodeWithTag("sleep_timer_cancel_button").performClick()
+            flakySafely {
+                check(
+                    composeTestRule.onAllNodesWithTag("player_active_timer_status")
+                        .fetchSemanticsNodes().isEmpty(),
+                ) { "Expected active timer status to disappear after cancellation" }
+            }
+        }
+
     }
 }

@@ -9,8 +9,10 @@
     <string name="player_files_count">Файлы · %1$d</string>
     <string name="player_file_current_name">%1$s · Сейчас</string>
     <string name="player_file_position">%1$d из %2$d</string>
-    <string name="player_listened_percent">Прослушано: %1$d%%</string>
-    <string name="player_time_remaining">Осталось: %1$s</string>
+    <string name="player_total_progress_info">Весь материал · %1$d%% · осталось %2$s</string>
+    <string name="player_active_timer_status">Таймер · %1$s</string>
+    <string name="player_speed_value_accessibility">Скорость воспроизведения %1$.2f×</string>
+    <string name="player_speed_selected">Выбрано</string>
     <string name="cd_close">Закрыть</string>
     <string name="player_close">Закрыть плеер</string>
 </resources>

@@ -3,7 +3,7 @@ package com.dalapenko.laba.feature.player
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
-internal const val SLEEP_TIMER_MAX_MINUTES = 180
+internal const val SLEEP_TIMER_MAX_MINUTES = 120
 internal const val MINUTES_PER_LAP = 60
 
 internal data class DialPosition(val lapIndex: Int, val angleDegrees: Float)
@@ -42,6 +42,10 @@ internal fun angleDelta(previousDegrees: Float, currentDegrees: Float): Float {
 /** Converts a cumulative (possibly multi-revolution) signed drag angle into a signed minute delta. */
 internal fun accumulatedAngleToMinutesDelta(accumulatedDegrees: Float): Int =
     (accumulatedDegrees / DEGREES_PER_MINUTE).roundToInt()
+
+internal fun minutesAfterDrag(valueAtDragStart: Int, accumulatedDegrees: Float): Int =
+    (valueAtDragStart + accumulatedAngleToMinutesDelta(accumulatedDegrees))
+        .coerceIn(0, SLEEP_TIMER_MAX_MINUTES)
 
 private const val DEGREES_PER_MINUTE = 6f
 private const val DEGREES_PER_CIRCLE = 360f
