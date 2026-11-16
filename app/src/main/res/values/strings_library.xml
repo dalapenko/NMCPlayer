@@ -45,7 +45,7 @@
         <item quantity="one">%1$d audio file</item>
         <item quantity="other">%1$d audio files</item>
     </plurals>
-    <string name="library_import_open">Open</string>
+    <string name="library_import_open">Close</string>
     <string name="library_import_open_library">Open library</string>
     <string name="library_import_choose_source">Choose source</string>
     <string name="library_title">Library</string>

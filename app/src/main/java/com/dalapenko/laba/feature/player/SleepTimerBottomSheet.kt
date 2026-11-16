@@ -52,13 +52,18 @@ fun SleepTimerBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .padding(
+                    start = 24.dp,
+                    end = 24.dp,
+                    top = if (isWide) 8.dp else 0.dp,
+                    bottom = 8.dp,
+                )
                 .testTag("sleep_timer_bottom_sheet"),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = if (isWide) Alignment.CenterVertically else Alignment.Top,
             ) {
                 Spacer(Modifier.weight(1f))
                 Text(

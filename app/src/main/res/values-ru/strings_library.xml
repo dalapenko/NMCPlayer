@@ -49,7 +49,7 @@
         <item quantity="many">%1$d аудиофайлов</item>
         <item quantity="other">%1$d аудиофайла</item>
     </plurals>
-    <string name="library_import_open">Открыть</string>
+    <string name="library_import_open">Закрыть</string>
     <string name="library_import_open_library">Открыть библиотеку</string>
     <string name="library_import_choose_source">Выбрать источник</string>
     <string name="library_title">Библиотека</string>

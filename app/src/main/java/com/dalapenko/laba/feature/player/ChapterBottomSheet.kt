@@ -12,7 +12,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dalapenko.laba.R
 import com.dalapenko.laba.core.database.entity.TrackEntity
+import com.dalapenko.laba.ui.components.AppModalBottomSheet
 import java.util.Locale
 
 private const val CURRENT_TRACK_HIGHLIGHT_ALPHA = 0.3f
@@ -40,18 +40,16 @@ fun ChapterBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
+    AppModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.testTag("chapter_bottom_sheet"),
     ) {
         Text(
             text = stringResource(R.string.chapters_title),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp)
                 .testTag("chapters_title"),
         )
 

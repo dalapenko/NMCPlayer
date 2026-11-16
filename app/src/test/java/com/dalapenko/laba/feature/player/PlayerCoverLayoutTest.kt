@@ -1,48 +1,83 @@
 package com.dalapenko.laba.feature.player
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerCoverLayoutTest {
     @Test
-    fun artworkSpacingShrinksBeforeScrollWhenContentNearlyFillsViewport() {
+    fun coverUsesAvailableHeightBeforeOverflow() {
         val budget = playerArtworkBudget(
             availableHeight = 500,
             reservedHeight = 460,
             availableWidth = 500,
             maxCoverSize = 237,
-            desiredSpacing = PlayerArtworkSpacing(48, 12),
         )
 
-        assertEquals(32, budget.topSpacing)
-        assertEquals(8, budget.bottomSpacing)
-        assertEquals(0, budget.coverSize)
+        assertEquals(0, budget.topSpacing)
+        assertEquals(0, budget.bottomSpacing)
+        assertEquals(40, budget.coverSize)
         assertEquals(500, budget.contentHeight)
     }
 
     @Test
-    fun smallCoverUsesFullArtworkSpacingWhenItFits() {
-        val budget = playerArtworkBudget(540, 460, 500, 237, PlayerArtworkSpacing(48, 12))
+    fun outerSpacingCentersTheWholePlayerContent() {
+        val budget = playerArtworkBudget(800, 460, 500, 180)
 
-        assertEquals(48, budget.topSpacing)
-        assertEquals(12, budget.bottomSpacing)
-        assertEquals(20, budget.coverSize)
-        assertEquals(540, budget.contentHeight)
+        assertEquals(budget.topSpacing, budget.bottomSpacing)
+        assertEquals(80, budget.topSpacing)
+        assertEquals(180, budget.coverSize)
+        assertEquals(800, budget.contentHeight)
     }
 
     @Test
-    fun artworkUsesFullSizeWhenThereIsEnoughSpace() {
-        val budget = playerArtworkBudget(800, 460, 500, 237, PlayerArtworkSpacing(48, 12))
+    fun wideArtworkShrinksToFitMeasuredMetadataAndProgressBeforeScroll() {
+        val coverSize = widePlayerArtworkSize(
+            availableHeight = 360,
+            reservedHeight = 176,
+            availableWidth = 320,
+            maxCoverSize = 237,
+            outerSpacing = 16,
+        )
 
-        assertEquals(48, budget.topSpacing)
-        assertEquals(12, budget.bottomSpacing)
-        assertEquals(237, budget.coverSize)
-        assertEquals(757, budget.contentHeight)
+        assertEquals(168, coverSize)
+        assertEquals(360, coverSize + 176 + 16)
     }
 
     @Test
-    fun scrollFallbackRemainsWhenMetadataAndControlsExceedViewport() {
-        val budget = playerArtworkBudget(500, 520, 400, 237, PlayerArtworkSpacing(48, 12))
+    fun wideArtworkCanShrinkToZeroWithoutInvalidConstraintsWhenNoSpaceRemains() {
+        val coverSize = widePlayerArtworkSize(
+            availableHeight = 360,
+            reservedHeight = 360,
+            availableWidth = 320,
+            maxCoverSize = 237,
+            outerSpacing = 16,
+        )
+
+        assertEquals(0, coverSize)
+        assertTrue(coverSize + 360 + 16 > 360)
+        assertEquals(
+            0,
+            widePlayerArtworkSize(
+                availableHeight = 0,
+                reservedHeight = 10,
+                availableWidth = -1,
+                maxCoverSize = 237,
+                outerSpacing = 16,
+            ),
+        )
+    }
+
+    @Test
+    fun playerLayoutSwitchesAtWidthBreakpointAndUsesCompactHeightBreakpoint() {
+        assertEquals(false to true, playerLayoutBreakpoints(719.dp, 499.dp))
+        assertEquals(true to false, playerLayoutBreakpoints(720.dp, 500.dp))
+    }
+
+    @Test
+    fun overflowKeepsControlsContentScrollableWithoutArtwork() {
+        val budget = playerArtworkBudget(500, 520, 400, 237)
 
         assertEquals(0, budget.topSpacing)
         assertEquals(0, budget.bottomSpacing)

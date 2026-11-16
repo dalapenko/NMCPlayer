@@ -64,7 +64,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -96,6 +95,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -107,6 +107,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -115,6 +117,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.dalapenko.laba.R
 import com.dalapenko.laba.core.data.BookWithProgress
+import com.dalapenko.laba.ui.components.AppModalBottomSheet
+import com.dalapenko.laba.ui.components.AppModalSheetHandle
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -372,9 +376,18 @@ private fun LibrarySortSheet(
     onDismiss: () -> Unit,
     onSortOptionSelected: (LibrarySortOption) -> Unit,
 ) {
-    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "sort_menu") {
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
-            LibraryModalHeader(stringResource(R.string.sort_menu_title), onDismiss)
+    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "sort_menu") { isWide ->
+        Column(
+            Modifier.fillMaxWidth().padding(
+                top = if (isWide) 16.dp else 0.dp,
+                bottom = 16.dp,
+            ),
+        ) {
+            LibraryModalHeader(
+                stringResource(R.string.sort_menu_title),
+                onDismiss,
+                compact = !isWide,
+            )
             LibrarySortOption.entries.forEach { option ->
                 val selected = option == selectedSortOption
                 val selectedDescription = if (selected) stringResource(R.string.sort_selected) else null
@@ -396,10 +409,10 @@ private fun LibrarySortSheet(
 }
 
 @Composable
-private fun SheetHeader(title: String, onDismiss: () -> Unit) {
+private fun SheetHeader(title: String, onDismiss: () -> Unit, compact: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = if (compact) Alignment.Top else Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         IconButton(onClick = onDismiss, modifier = Modifier.testTag("sheet_close")) {
@@ -414,7 +427,7 @@ private fun ResponsiveLibraryModal(
     dismissible: Boolean = true,
     onDismiss: () -> Unit,
     testTag: String,
-    content: @Composable () -> Unit,
+    content: @Composable (isWide: Boolean) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val modalMaxHeight = maxHeight * MODAL_MAX_HEIGHT_FRACTION
@@ -433,18 +446,8 @@ private fun ResponsiveLibraryModal(
                         color = MaterialTheme.colorScheme.surface,
                     ) {
                         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                            Box(
-                                Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Box(
-                                    Modifier
-                                        .size(width = 48.dp, height = 4.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
-                                )
-                            }
-                            content()
+                            AppModalSheetHandle()
+                            content(true)
                         }
                     }
                 }
@@ -454,40 +457,99 @@ private fun ResponsiveLibraryModal(
                 skipPartiallyExpanded = true,
                 confirmValueChange = { dismissible || it != SheetValue.Hidden },
             )
-            ModalBottomSheet(
+            AppModalBottomSheet(
                 onDismissRequest = { if (dismissible) onDismiss() },
                 sheetState = sheetState,
                 modifier = Modifier.testTag(testTag),
             ) {
-                content()
+                content(false)
             }
         }
     }
 }
 
 @Composable
-private fun LibraryModalHeader(title: String, onDismiss: (() -> Unit)?) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        onDismiss?.let { dismiss ->
-            IconButton(onClick = dismiss, modifier = Modifier.testTag("sheet_close")) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.library_modal_close))
+@Suppress("LongMethod")
+private fun LibraryModalHeader(
+    title: String,
+    onDismiss: (() -> Unit)?,
+    bottomSpacing: Dp = 12.dp,
+    alignTitleToBottom: Boolean = false,
+    compact: Boolean = false,
+    overlayTrailing: Boolean = false,
+) {
+    val headerModifier = Modifier.fillMaxWidth()
+        .padding(start = 24.dp, end = 12.dp, bottom = bottomSpacing)
+    if (overlayTrailing) {
+        Layout(
+            modifier = headerModifier,
+            content = {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.testTag("import_result_title"),
+                )
+                onDismiss?.let { dismiss ->
+                    IconButton(onClick = dismiss, modifier = Modifier.testTag("sheet_close")) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.library_modal_close))
+                    }
+                }
+            },
+        ) { measurables, constraints ->
+            val buttonPlaceable = measurables.getOrNull(1)?.measure(
+                Constraints.fixed(48.dp.roundToPx(), 48.dp.roundToPx()),
+            )
+            val titleWidth = if (buttonPlaceable == null) {
+                constraints.maxWidth
+            } else {
+                (constraints.maxWidth - buttonPlaceable.width).coerceAtLeast(0)
+            }
+            val titlePlaceable = measurables.first().measure(
+                Constraints(maxWidth = titleWidth, maxHeight = constraints.maxHeight),
+            )
+            val measuredWidth = titlePlaceable.width + (buttonPlaceable?.width ?: 0)
+            val width = if (constraints.hasBoundedWidth) {
+                constraints.maxWidth
+            } else {
+                maxOf(measuredWidth, constraints.minWidth)
+            }
+            layout(width, titlePlaceable.height) {
+                titlePlaceable.placeRelative(0, 0)
+                buttonPlaceable?.placeRelative(width - buttonPlaceable.width, 0)
+            }
+        }
+    } else {
+        Row(
+            modifier = headerModifier,
+            verticalAlignment = when {
+                alignTitleToBottom -> Alignment.Bottom
+                compact -> Alignment.Top
+                else -> Alignment.CenterVertically
+            },
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f).testTag("import_result_title"),
+            )
+            onDismiss?.let { dismiss ->
+                IconButton(onClick = dismiss, modifier = Modifier.testTag("sheet_close")) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.library_modal_close))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryStateIcon(icon: ImageVector) {
+private fun LibraryStateIcon(icon: ImageVector, topSpacing: Dp = 4.dp) {
     Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = topSpacing, bottom = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer)
+                .testTag("library_state_icon"),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -500,9 +562,9 @@ private fun LibraryStateIcon(icon: ImageVector) {
     }
 }
 
-@Suppress("LongMethod") // This modal's scan-result states form one cohesive Compose presentation.
+@Suppress("LongMethod", "CyclomaticComplexMethod") // Import states form one cohesive Compose presentation.
 @Composable
-private fun LibraryImportOutcomeModal(
+internal fun LibraryImportOutcomeModal(
     isScanning: Boolean,
     sourceName: String?,
     result: ScanResult?,
@@ -513,9 +575,9 @@ private fun LibraryImportOutcomeModal(
         dismissible = !isScanning,
         onDismiss = onDismiss,
         testTag = "import_result_sheet",
-    ) {
+    ) { isWide ->
         val scanProgressDescription = stringResource(R.string.library_scan_in_progress)
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
             val title = when {
                 isScanning -> stringResource(R.string.library_import_scanning_title)
                 result is ScanResult.Success -> stringResource(R.string.library_import_added_title)
@@ -530,14 +592,30 @@ private fun LibraryImportOutcomeModal(
                 result is ScanResult.Duplicate -> Icons.Default.Info
                 else -> Icons.Default.Folder
             }
-            LibraryModalHeader(title, if (isScanning) null else onDismiss)
-            LibraryStateIcon(stateIcon)
+            LibraryModalHeader(
+                title,
+                if (isScanning) null else onDismiss,
+                bottomSpacing = if (isWide) {
+                    if (result is ScanResult.Success) 8.dp else 12.dp
+                } else {
+                    0.dp
+                },
+                alignTitleToBottom = isWide && result is ScanResult.Success,
+                compact = !isWide,
+                overlayTrailing = !isWide,
+            )
+            LibraryStateIcon(
+                stateIcon,
+                topSpacing = if (isWide) 8.dp else 16.dp,
+            )
             when {
                 isScanning -> {
                     Text(
                         text = sourceName?.let { stringResource(R.string.library_import_scanning_folder, it) }
                             ?: stringResource(R.string.library_import_scanning_message),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                            .padding(top = if (isWide) 0.dp else 8.dp)
+                            .testTag("import_outcome_message"),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     CircularProgressIndicator(
@@ -552,11 +630,13 @@ private fun LibraryImportOutcomeModal(
                 result is ScanResult.Success -> {
                     Text(
                         result.title,
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp).padding(top = 8.dp)
+                            .testTag("import_file_info"),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Row(
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            .testTag("import_file_counts"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -585,7 +665,9 @@ private fun LibraryImportOutcomeModal(
                 result is ScanResult.Empty -> {
                     Text(
                         stringResource(R.string.snackbar_no_audio_files),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                            .padding(top = if (isWide) 0.dp else 8.dp)
+                            .testTag("import_outcome_message"),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Button(
@@ -598,7 +680,9 @@ private fun LibraryImportOutcomeModal(
                 result is ScanResult.Duplicate -> {
                     Text(
                         stringResource(R.string.library_import_duplicate_message, result.sourceName),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                            .padding(top = if (isWide) 0.dp else 8.dp)
+                            .testTag("import_outcome_message"),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Button(
@@ -611,7 +695,9 @@ private fun LibraryImportOutcomeModal(
                 else -> {
                     Text(
                         stringResource(R.string.snackbar_permission_denied),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                            .padding(top = if (isWide) 0.dp else 8.dp)
+                            .testTag("import_outcome_message"),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Button(
@@ -632,13 +718,25 @@ private fun UnavailableSourceModal(
     onDismiss: () -> Unit,
     onCheckAgain: () -> Unit,
 ) {
-    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "unavailable_source_sheet") {
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
-            LibraryModalHeader(stringResource(R.string.library_source_unavailable_title), onDismiss)
-            LibraryStateIcon(Icons.Default.Warning)
+    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "unavailable_source_sheet") { isWide ->
+        Column(
+            Modifier.fillMaxWidth().padding(
+                top = if (isWide) 16.dp else 0.dp,
+                bottom = 16.dp,
+            ),
+        ) {
+            LibraryModalHeader(
+                stringResource(R.string.library_source_unavailable_title),
+                onDismiss,
+                bottomSpacing = if (isWide) 12.dp else 0.dp,
+                compact = !isWide,
+                overlayTrailing = !isWide,
+            )
+            LibraryStateIcon(Icons.Default.Warning, topSpacing = if (isWide) 8.dp else 16.dp)
             Text(
                 book.book.title,
-                modifier = Modifier.padding(horizontal = 24.dp),
+                modifier = Modifier.padding(horizontal = 24.dp)
+                    .padding(top = if (isWide) 0.dp else 8.dp),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -663,9 +761,18 @@ private fun LibraryFilterSheet(
     onDismiss: () -> Unit,
     onFilterChange: (LibraryFilter) -> Unit,
 ) {
-    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "filter_sheet") {
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
-            LibraryModalHeader(stringResource(R.string.library_filter_sheet_title), onDismiss)
+    ResponsiveLibraryModal(onDismiss = onDismiss, testTag = "filter_sheet") { isWide ->
+        Column(
+            Modifier.fillMaxWidth().padding(
+                top = if (isWide) 16.dp else 0.dp,
+                bottom = 16.dp,
+            ),
+        ) {
+            LibraryModalHeader(
+                stringResource(R.string.library_filter_sheet_title),
+                onDismiss,
+                compact = !isWide,
+            )
             LibraryFilter.entries.forEach { filter ->
                 val selected = selectedFilter == filter
                 val selectedDescription = if (selected) stringResource(R.string.library_filter_selected) else null
@@ -701,6 +808,7 @@ private fun sortOptionLabel(option: LibrarySortOption): String = stringResource(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod")
 private fun LibraryFabMenu(
     expanded: Boolean,
     fabVisible: Boolean,
@@ -720,11 +828,18 @@ private fun LibraryFabMenu(
         ResponsiveLibraryModal(
             onDismiss = { onExpandChange(false) },
             testTag = "fab_menu",
-        ) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
-                SheetHeader(stringResource(R.string.library_add_audio_title)) {
-                    onExpandChange(false)
-                }
+        ) { isWide ->
+            Column(
+                Modifier.fillMaxWidth().padding(
+                    top = if (isWide) 16.dp else 0.dp,
+                    bottom = 16.dp,
+                ),
+            ) {
+                SheetHeader(
+                    stringResource(R.string.library_add_audio_title),
+                    onDismiss = { onExpandChange(false) },
+                    compact = !isWide,
+                )
                 LibraryAddAudioOption(
                     icon = Icons.Default.CreateNewFolder,
                     title = stringResource(R.string.menu_add_folder),

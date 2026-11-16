@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -43,13 +44,14 @@ import com.dalapenko.laba.R
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
-@Suppress("LongMethod")
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 @Composable
 fun PlayerFilesScreen(
     bookId: Long,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     maxPanelHeight: Dp? = null,
+    modalSheetHandle: Boolean = false,
     viewModel: PlayerFilesViewModel = koinViewModel { parametersOf(bookId) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,17 +83,18 @@ fun PlayerFilesScreen(
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
                     start = 24.dp,
-                    top = if (maxPanelHeight != null) 8.dp else 20.dp,
+                    top = if (maxPanelHeight != null) 8.dp else if (modalSheetHandle) 0.dp else 20.dp,
                     end = 12.dp,
                     bottom = 12.dp,
                 ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                Column(Modifier.weight(1f).padding(top = if (modalSheetHandle) 0.dp else 4.dp)) {
                     Text(
                         text = stringResource(R.string.player_files_count, state.tracks.size),
                         style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.testTag("player_files_title"),
                     )
                     Text(
                         text = state.title.ifBlank { stringResource(R.string.player_files_title) },
@@ -100,7 +103,10 @@ fun PlayerFilesScreen(
                         maxLines = 2,
                     )
                 }
-                IconButton(onClick = onBack, modifier = Modifier.testTag("close_player_files_button")) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp).testTag("close_player_files_button"),
+                ) {
                     Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                 }
             }

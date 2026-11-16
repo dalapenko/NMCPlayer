@@ -43,7 +43,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -81,16 +80,15 @@ import coil3.compose.AsyncImage
 import com.dalapenko.laba.R
 import com.dalapenko.laba.core.media.PlayerState
 import com.dalapenko.laba.core.media.remainingPlaybackTimeMs
+import com.dalapenko.laba.ui.components.AppModalBottomSheet
 import kotlinx.coroutines.flow.Flow
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val PLAYER_WIDE_LAYOUT_MIN_WIDTH = 720.dp
-private val PLAYER_COVER_SIZE = 237.dp
+private val PLAYER_COVER_SIZE = 180.dp
 private val WIDE_PLAYER_COVER_SIZE = 237.dp
-private val WIDE_PLAYER_COVER_METADATA_SPACE = 120.dp
 private val LANDSCAPE_TRANSPORT_ICON_SIZE = 32.dp
 private val LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE = 56.dp
 private val PORTRAIT_TRANSPORT_ICON_SIZE = 36.dp
@@ -197,20 +195,23 @@ private fun AudioFileErrorContent(
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
     onChooseAnotherFile: () -> Unit,
+    compactHeader: Boolean = false,
+    topPadding: Dp = 16.dp,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp)
+            .padding(top = topPadding, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = if (compactHeader) Alignment.Top else Alignment.CenterVertically,
         ) {
             Text(
                 text = stringResource(R.string.player_audio_error_title),
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("player_audio_error_title"),
             )
             IconButton(onClick = onDismiss, modifier = Modifier.testTag("player_audio_error_close_button")) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.player_audio_error_close))
@@ -288,7 +289,7 @@ private fun PlayerScaffold(
     var showFiles by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val isWide = maxWidth >= PLAYER_WIDE_LAYOUT_MIN_WIDTH
+        val isWide = playerLayoutBreakpoints(maxWidth, maxHeight).first
         val panelMaxHeight = maxHeight * PLAYER_PANEL_MAX_HEIGHT_FRACTION
         val isTabletLayout = maxWidth >= 1200.dp || filesInPane
         val openFiles = { if (isTabletLayout) onOpenFiles() else showFiles = true }
@@ -422,11 +423,15 @@ private fun PlayerFilesOverlay(
 ) {
     if (visible) {
         if (narrow) {
-            ModalBottomSheet(onDismissRequest = onDismiss) {
+            AppModalBottomSheet(
+                onDismissRequest = onDismiss,
+                modifier = Modifier.testTag("player_files_sheet_surface"),
+            ) {
                 PlayerFilesScreen(
                     bookId = bookId,
                     onBack = onDismiss,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
+                    modalSheetHandle = true,
                 )
             }
         } else {
@@ -458,7 +463,7 @@ private fun PlayerFilesOverlay(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrackUnavailableOverlay(
+internal fun TrackUnavailableOverlay(
     error: PlayerEvent.TrackUnavailable,
     canRetry: Boolean,
     narrow: Boolean,
@@ -470,13 +475,19 @@ private fun TrackUnavailableOverlay(
     val fallbackName = stringResource(R.string.fallback_track_name)
     val fileName = error.trackName ?: String.format(fallbackName, error.trackIndex + 1)
     if (narrow) {
-        ModalBottomSheet(
+        AppModalBottomSheet(
             onDismissRequest = onDismiss,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.testTag("player_audio_error_sheet"),
         ) {
-            AudioFileErrorContent(fileName, canRetry, onDismiss, onRetry, onChooseAnotherFile)
+            AudioFileErrorContent(
+                fileName,
+                canRetry,
+                onDismiss,
+                onRetry,
+                onChooseAnotherFile,
+                compactHeader = true,
+                topPadding = 0.dp,
+            )
         }
     } else {
         Dialog(
@@ -665,7 +676,7 @@ private fun PhonePlayerContent(
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         Box(Modifier.matchParentSize().testTag("player_content_bounds"))
         PhonePlayerLayout(availableHeight = maxHeight) {
-            Spacer(Modifier.height(48.dp))
+            Spacer(Modifier.height(0.dp).testTag("player_outer_top_space"))
             CoverArt(
                 state.coverUri,
                 state.title,
@@ -693,7 +704,7 @@ private fun PhonePlayerContent(
             )
             Spacer(Modifier.height(20.dp))
             InlineSpeedControls(state.playbackSpeed, onShowSpeed, onSetSpeed)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(0.dp).testTag("player_outer_bottom_space"))
         }
     }
 }
@@ -709,7 +720,7 @@ private fun PhonePlayerLayout(
     ) { measurables, constraints ->
         val coverIndex = 1
         val topArtworkSpacingIndex = 0
-        val bottomArtworkSpacingIndex = 2
+        val bottomArtworkSpacingIndex = measurables.lastIndex
         val childConstraints = constraints.copy(minWidth = 0, maxHeight = Constraints.Infinity)
         val placeables = arrayOfNulls<Placeable>(measurables.size)
         var reservedHeight = 0
@@ -726,7 +737,6 @@ private fun PhonePlayerLayout(
             reservedHeight = reservedHeight,
             availableWidth = constraints.maxWidth,
             maxCoverSize = PLAYER_COVER_SIZE.roundToPx(),
-            desiredSpacing = PlayerArtworkSpacing(48.dp.roundToPx(), 12.dp.roundToPx()),
         )
         placeables[topArtworkSpacingIndex] =
             measurables[topArtworkSpacingIndex].measure(Constraints.fixed(0, budget.topSpacing))
@@ -748,44 +758,8 @@ private fun PhonePlayerLayout(
     }
 }
 
-internal data class PlayerArtworkBudget(
-    val topSpacing: Int,
-    val bottomSpacing: Int,
-    val coverSize: Int,
-    val contentHeight: Int,
-)
-
-internal data class PlayerArtworkSpacing(val top: Int, val bottom: Int)
-
-internal fun playerArtworkBudget(
-    availableHeight: Int,
-    reservedHeight: Int,
-    availableWidth: Int,
-    maxCoverSize: Int,
-    desiredSpacing: PlayerArtworkSpacing,
-): PlayerArtworkBudget {
-    val remainingHeight = (availableHeight - reservedHeight).coerceAtLeast(0)
-    val desiredSpacingTotal = desiredSpacing.top + desiredSpacing.bottom
-    val artworkSpacing = minOf(remainingHeight, desiredSpacingTotal)
-    val topSpacing = if (desiredSpacingTotal == 0) {
-        0
-    } else {
-        artworkSpacing * desiredSpacing.top / desiredSpacingTotal
-    }
-    val bottomSpacing = artworkSpacing - topSpacing
-    val coverSize = minOf(maxCoverSize, availableWidth, remainingHeight - artworkSpacing)
-    return PlayerArtworkBudget(
-        topSpacing = topSpacing,
-        bottomSpacing = bottomSpacing,
-        coverSize = coverSize,
-        contentHeight = reservedHeight + artworkSpacing + coverSize,
-    )
-}
-
-internal fun centeredPlayerChildX(layoutWidth: Int, childWidth: Int): Int =
-    ((layoutWidth - childWidth) / 2).coerceAtLeast(0)
-
 @Composable
+@Suppress("LongMethod") // The two adaptive player columns share the same measured window bounds.
 private fun WidePlayerContent(
     state: PlaybackDisplayState,
     actions: TransportActions,
@@ -795,12 +769,11 @@ private fun WidePlayerContent(
     tabletLayout: Boolean,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-        val compact = maxHeight < 500.dp
+        val compact = playerLayoutBreakpoints(maxWidth, maxHeight).second
+        val availableHeight = maxHeight
+        val outerSpacing = if (compact) 0.dp else 16.dp
+        val contentAvailableHeight = (availableHeight - outerSpacing).coerceAtLeast(0.dp)
         val tabletMainPane = tabletLayout
-        val coverSize = minOf(
-            WIDE_PLAYER_COVER_SIZE,
-            (maxHeight - WIDE_PLAYER_COVER_METADATA_SPACE).coerceAtLeast(120.dp),
-        )
         Box(Modifier.matchParentSize().testTag("player_content_bounds"))
         Row(
             modifier = Modifier.fillMaxHeight()
@@ -819,24 +792,74 @@ private fun WidePlayerContent(
                 modifier = Modifier
                     .then(if (tabletMainPane) Modifier.width(424.dp) else Modifier.weight(1f))
                     .fillMaxHeight()
-                    .padding(start = if (tabletMainPane) 68.dp else 0.dp),
+                    .padding(start = if (tabletMainPane) 68.dp else 0.dp)
+                    .verticalScroll(rememberScrollState())
+                    .testTag("player_left_column"),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top,
             ) {
-                Spacer(Modifier.height(if (compact) 0.dp else 76.dp))
-                CoverArt(state.coverUri, state.title, Modifier.size(coverSize))
-                Spacer(Modifier.height(12.dp))
-                BookInfo(state)
+                Layout(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = contentAvailableHeight),
+                    content = {
+                        CoverArt(
+                            state.coverUri,
+                            state.title,
+                            Modifier.testTag("player_cover_art"),
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Spacer(Modifier.height(12.dp))
+                            BookInfo(state)
+                            if (state.trackCount > 1) {
+                                Spacer(Modifier.height(if (compact) 4.dp else 12.dp))
+                                BookProgress(
+                                    state,
+                                    Modifier.padding(horizontal = 24.dp),
+                                    compact = compact,
+                                )
+                            }
+                            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+                            TrackInfo(state, compact = compact)
+                            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+                            ProgressSection(
+                                state,
+                                actions.onSeekChange,
+                                actions.onSeekFinished,
+                                Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
+                    },
+                ) { measurables, constraints ->
+                    val otherContent = measurables[1].measure(
+                        constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity),
+                    )
+                    val coverSize = widePlayerArtworkSize(
+                        availableHeight = availableHeight.roundToPx(),
+                        reservedHeight = otherContent.height,
+                        availableWidth = constraints.maxWidth,
+                        maxCoverSize = WIDE_PLAYER_COVER_SIZE.roundToPx(),
+                        outerSpacing = outerSpacing.roundToPx(),
+                    )
+                    val cover = measurables[0].measure(
+                        Constraints.fixed(coverSize.coerceAtLeast(0), coverSize.coerceAtLeast(0)),
+                    )
+                    val contentHeight = cover.height + otherContent.height
+                    val innerHeight = contentAvailableHeight.roundToPx()
+                    val layoutHeight = maxOf(innerHeight, contentHeight, constraints.minHeight)
+                    val top = ((innerHeight - contentHeight) / 2).coerceAtLeast(0)
+                    layout(constraints.maxWidth, layoutHeight) {
+                        cover.placeRelative(centeredPlayerChildX(constraints.maxWidth, cover.width), top)
+                        otherContent.placeRelative(0, top + cover.height)
+                    }
+                }
             }
             Spacer(Modifier.width(if (tabletMainPane) 0.dp else 24.dp))
             WidePlayerControls(
                 state = state,
                 actions = actions,
                 compact = compact,
-                tabletMainPane = tabletMainPane,
+                availableHeight = contentAvailableHeight,
                 onShowSpeed = onShowSpeed,
                 onSetSpeed = onSetSpeed,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("player_right_column"),
             )
         }
     }
@@ -847,7 +870,7 @@ private fun WidePlayerControls(
     state: PlaybackDisplayState,
     actions: TransportActions,
     compact: Boolean,
-    tabletMainPane: Boolean,
+    availableHeight: Dp,
     onShowSpeed: () -> Unit,
     onSetSpeed: (Float) -> Unit,
     modifier: Modifier,
@@ -855,22 +878,17 @@ private fun WidePlayerControls(
     Column(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top,
     ) {
-        Spacer(Modifier.height(if (compact) 0.dp else if (tabletMainPane) 76.dp else 0.dp))
-        TrackInfo(state, compact = compact)
-        if (state.trackCount > 1) {
-            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
-            BookProgress(state, compact = compact)
-            Spacer(Modifier.height(if (compact) 4.dp else 8.dp))
-        } else {
-            Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+        Box(
+            Modifier.fillMaxWidth().heightIn(min = availableHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TransportControls(state, actions, LANDSCAPE_TRANSPORT_ICON_SIZE, LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE)
+                Spacer(Modifier.height(if (compact) 16.dp else 32.dp))
+                InlineSpeedControls(state.playbackSpeed, onShowSpeed, onSetSpeed, compact = compact)
+            }
         }
-        ProgressSection(state, actions.onSeekChange, actions.onSeekFinished)
-        Spacer(Modifier.height(if (compact) 4.dp else 20.dp))
-        TransportControls(state, actions, LANDSCAPE_TRANSPORT_ICON_SIZE, LANDSCAPE_TRANSPORT_PLAY_BUTTON_SIZE)
-        Spacer(Modifier.height(if (compact) 4.dp else 28.dp))
-        InlineSpeedControls(state.playbackSpeed, onShowSpeed, onSetSpeed, compact = compact)
     }
 }
 
